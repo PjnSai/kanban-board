@@ -4,7 +4,8 @@ from .serializers import BoardSerializer, ListSerializer, CardSerializer
 from rest_framework import generics, viewsets, permissions 
 from .serializers import RegisterSerializer
 from django.contrib.auth.models import User
-
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 
 class BoardViewSet(viewsets.ModelViewSet):
@@ -32,6 +33,23 @@ class CardViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Card.objects.filter(list__board__owner=self.request.user)
+
+    def perform_update(self, serializer):
+        card = serializer.save()
+        board_id = card.list.board.id
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'board_{board_id}',
+            {
+                'type': 'board_message',
+                'message': {
+                    'event': 'card_moved',
+                    'card_id': card.id,
+                    'list_id': card.list.id,
+                    'position': card.position,
+                },
+            }
+        )
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
