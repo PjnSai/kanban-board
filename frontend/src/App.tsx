@@ -4,6 +4,8 @@ import { DndContext, closestCenter } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import ListColumn from './ListColumn';
 import { updateCard } from './api';
+import AuthForm from './AuthForm';
+import { isLoggedIn, getAccessToken, clearTokens } from './auth';
 
 interface Card {
   id: number;
@@ -28,18 +30,22 @@ interface Board {
 function App() {
   const [boards, setBoards] = useState<Board[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loggedIn, setLoggedIn] = useState(isLoggedIn());
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/boards/')
+    if (!loggedIn) return;
+    fetch('http://localhost:8000/api/boards/', {
+      headers: { Authorization: `Bearer ${getAccessToken()}` },
+    })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
       .then((data) => setBoards(data))
       .catch((err) => setError(err.message));
-  }, []);
+  }, [loggedIn]);
 
-  if (error) return <div>Error loading boards: {error}</div>;
+
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -98,10 +104,20 @@ function App() {
     );
   }
 
-    return (
+  if (!loggedIn) {
+    return <AuthForm onSuccess={() => setLoggedIn(true)} />;
+  }
+
+  return (
     <div className="app">
-      <h1>My Boards</h1>
-      {boards.map((board) => (
+      <div className="app-header">
+        <h1>My Boards</h1>
+        <button onClick={() => { clearTokens(); setLoggedIn(false); }}>
+          Logout
+        </button>
+      </div>
+      {error && <p className="auth-error">Error loading boards: {error}</p>}
+      {!error && boards.map((board) => (
         <div key={board.id} className="board">
           <h2>{board.name}</h2>
           <div className="board-columns">
