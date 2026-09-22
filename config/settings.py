@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+from corsheaders.defaults import default_headers
+
 
 
 load_dotenv()
@@ -158,3 +160,6 @@ MAILERS = {
 }
 
 CORS_ALLOWED_ORIGINS = ["http://localhost:5173"]
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'x-client-id',
+]

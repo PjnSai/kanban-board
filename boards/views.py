@@ -15,8 +15,24 @@ class BoardViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Board.objects.filter(owner=self.request.user)
 
-    def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+    def perform_update(self, serializer):
+        card = serializer.save()
+        board_id = card.list.board.id
+        client_id = self.request.headers.get('X-Client-Id', '')
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'board_{board_id}',
+            {
+                'type': 'board_message',
+                'message': {
+                    'event': 'card_moved',
+                    'card_id': card.id,
+                    'list_id': card.list.id,
+                    'position': card.position,
+                    'origin': client_id,
+                },
+            }
+        )
 
 
 class ListViewSet(viewsets.ModelViewSet):

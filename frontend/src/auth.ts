@@ -43,6 +43,23 @@ export async function register(username: string, email: string, password: string
   await login(username, password);
 }
 
+export async function refreshAccessToken(): Promise<boolean> {
+  const refresh = getRefreshToken();
+  if (!refresh) return false;
+
+  const res = await fetch(`${API_BASE}/auth/refresh/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh }),
+  });
+
+  if (!res.ok) return false;
+
+  const data = await res.json();
+  localStorage.setItem('access_token', data.access);
+  return true;
+}
+
 export function isLoggedIn(): boolean {
   return !!getAccessToken();
 }
