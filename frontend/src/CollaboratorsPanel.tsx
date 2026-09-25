@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { addCollaborator } from './api';
+import { addCollaborator, removeCollaborator } from './api';
 
 interface CollaboratorsPanelProps {
   boardId: number;
   collaborators: string[];
+  isOwner: boolean;
   onAdded: (username: string) => void;
+  onRemoved: (username: string) => void;
 }
 
-function CollaboratorsPanel({ boardId, collaborators, onAdded }: CollaboratorsPanelProps) {
+function CollaboratorsPanel({ boardId, collaborators, isOwner, onAdded, onRemoved }: CollaboratorsPanelProps) {
   const [username, setUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -25,6 +27,15 @@ function CollaboratorsPanel({ boardId, collaborators, onAdded }: CollaboratorsPa
     }
   }
 
+  async function handleRemove(name: string) {
+    try {
+      await removeCollaborator(boardId, name);
+      onRemoved(name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove collaborator');
+    }
+  }
+
   return (
     <div className="mb-4">
       <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500 mb-2">
@@ -33,8 +44,17 @@ function CollaboratorsPanel({ boardId, collaborators, onAdded }: CollaboratorsPa
           <span className="text-slate-400">no one yet</span>
         ) : (
           collaborators.map((name) => (
-            <span key={name} className="bg-slate-100 rounded-full px-2 py-0.5 text-slate-600">
+            <span key={name} className="bg-slate-100 rounded-full px-2 py-0.5 text-slate-600 flex items-center gap-1">
               {name}
+              {isOwner && (
+                <button
+                  onClick={() => handleRemove(name)}
+                  className="text-slate-400 hover:text-red-600"
+                  title="Remove collaborator"
+                >
+                  ✕
+                </button>
+              )}
             </span>
           ))
         )}

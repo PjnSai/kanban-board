@@ -34,11 +34,16 @@ class ListSerializer(serializers.ModelSerializer):
 class BoardSerializer(serializers.ModelSerializer):
     lists = ListSerializer(many=True, read_only=True)
     collaborators = serializers.SlugRelatedField(many=True, read_only=True, slug_field='username')
+    is_owner = serializers.SerializerMethodField()
 
     class Meta:
         model = Board
-        fields = ['id', 'name', 'owner', 'position', 'created_at', 'lists', 'collaborators']
+        fields = ['id', 'name', 'owner', 'position', 'created_at', 'lists', 'collaborators', 'is_owner']
         read_only_fields = ['owner']
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        return request and obj.owner == request.user
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])

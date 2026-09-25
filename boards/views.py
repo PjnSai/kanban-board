@@ -13,12 +13,7 @@ from django.db.models import Q
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .serializers import CollaboratorSerializer
-
-
-
-
-    
-
+from rest_framework.exceptions import PermissionDenied
 
 
 class BoardViewSet(viewsets.ModelViewSet):
@@ -31,6 +26,11 @@ class BoardViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
+
+    def perform_destroy(self, instance):
+        if instance.owner != self.request.user:
+            raise PermissionDenied("Only the board owner can delete this board.")
+        instance.delete()
 
 
     @action(detail=True, methods=['post'], url_path='add-collaborator')
@@ -48,6 +48,27 @@ class BoardViewSet(viewsets.ModelViewSet):
 
         board.collaborators.add(user)
         return Response({'detail': f'{user.username} added.'}, status=200)
+
+    @action(detail=True, methods=['post'], url_path='leave')
+    def leave(self, request, pk=None):
+        board = self.get_object()
+        if board.owner == request.user:
+            return Response({'detail': 'Owners cannot leave their own board. Delete it instead.'}, status=400)
+        board.collaborators.remove(request.user)
+        return Response({'detail': 'You have left the board.'}, status=200)
+
+    @action(detail=True, methods=['post'], url_path='remove-collaborator')
+    def remove_collaborator(self, request, pk=None):
+        board = self.get_object()
+        if board.owner != request.user:
+            return Response({'detail': 'Only the owner can remove collaborators.'}, status=403)
+
+        serializer = CollaboratorSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['username']
+
+        board.collaborators.remove(user)
+        return Response({'detail': f'{user.username} removed.'}, status=200)
 
 
 class ListViewSet(viewsets.ModelViewSet):
@@ -122,3 +143,9 @@ class LogoutView(APIView):
         except Exception:
             return Response(status=400)
 
+class DeleteAccountView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request):
+        request.user.delete()
+        return Response(status=204)

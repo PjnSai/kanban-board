@@ -153,7 +153,9 @@ function BoardView() {
       <CollaboratorsPanel
         boardId={board.id}
         collaborators={board.collaborators}
+        isOwner={board.is_owner}
         onAdded={(username) => setBoard({ ...board, collaborators: [...board.collaborators, username] })}
+        onRemoved={(username) => setBoard({ ...board, collaborators: board.collaborators.filter((c) => c !== username) })}
       />
       <div className="flex items-start gap-4 overflow-x-auto pb-2">
         <DndContext

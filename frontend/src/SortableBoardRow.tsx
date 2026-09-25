@@ -6,6 +6,7 @@ interface Board {
   id: number;
   name: string;
   position: number;
+  is_owner: boolean;
 }
 
 interface SortableBoardRowProps {
@@ -16,10 +17,11 @@ interface SortableBoardRowProps {
   onEditChange: (value: string) => void;
   onSaveEdit: () => void;
   onDelete: () => void;
+  onLeave: () => void;
 }
 
 function SortableBoardRow({
-  board, isEditing, editValue, onStartEdit, onEditChange, onSaveEdit, onDelete,
+  board, isEditing, editValue, onStartEdit, onEditChange, onSaveEdit, onDelete, onLeave,
 }: SortableBoardRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: board.id });
   const style = {
@@ -53,18 +55,29 @@ function SortableBoardRow({
             {board.name}
           </Link>
         )}
+        {!board.is_owner && (
+          <span className="text-xs text-slate-400 bg-slate-50 rounded px-1.5 py-0.5">shared</span>
+        )}
       </div>
       <div className="flex items-center gap-2 ml-3">
-        <button onClick={onStartEdit} className="text-xs text-slate-400 hover:text-blue-600">
-          Rename
-        </button>
-        <button
-          onClick={onDelete}
-          className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-600 text-xs"
-          title="Delete board"
-        >
-          ✕
-        </button>
+        {board.is_owner ? (
+          <>
+            <button onClick={onStartEdit} className="text-xs text-slate-400 hover:text-blue-600">
+              Rename
+            </button>
+            <button
+              onClick={onDelete}
+              className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-600 text-xs"
+              title="Delete board"
+            >
+              ✕
+            </button>
+          </>
+        ) : (
+          <button onClick={onLeave} className="text-xs text-slate-400 hover:text-red-600">
+            Leave
+          </button>
+        )}
       </div>
     </div>
   );

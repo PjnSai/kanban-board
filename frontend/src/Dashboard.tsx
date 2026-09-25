@@ -10,6 +10,7 @@ import {
   SortableContext, verticalListSortingStrategy, arrayMove,
 } from '@dnd-kit/sortable';
 import { updateBoardPosition } from './api';
+import { leaveBoard } from './api';
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -17,8 +18,8 @@ interface Board {
   id: number;
   name: string;
   position: number;
+  is_owner: boolean;
 }
-
 function Dashboard() {
   const [boards, setBoards] = useState<Board[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,6 +100,16 @@ function Dashboard() {
     }
   }
 
+  async function handleLeave(boardId: number) {
+    if (!window.confirm('Leave this board? You will lose access to it.')) return;
+    try {
+        await leaveBoard(boardId);
+        setBoards((prev) => prev.filter((b) => b.id !== boardId));
+    } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to leave board');
+    }
+    }
+
   return (
     <div className="max-w-2xl">
       {error && (
@@ -134,14 +145,15 @@ function Dashboard() {
             <div className="flex flex-col gap-2">
             {boards.map((board) => (
                 <SortableBoardRow
-                key={board.id}
-                board={board}
-                isEditing={editingBoardId === board.id}
-                editValue={editBoardName}
-                onStartEdit={() => startEditing(board)}
-                onEditChange={setEditBoardName}
-                onSaveEdit={() => saveEdit(board.id)}
-                onDelete={() => handleDelete(board.id)}
+                    key={board.id}
+                    board={board}
+                    isEditing={editingBoardId === board.id}
+                    editValue={editBoardName}
+                    onStartEdit={() => startEditing(board)}
+                    onEditChange={setEditBoardName}
+                    onSaveEdit={() => saveEdit(board.id)}
+                    onDelete={() => handleDelete(board.id)}
+                    onLeave={() => handleLeave(board.id)}
                 />
             ))}
             </div>

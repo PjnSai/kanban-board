@@ -83,3 +83,13 @@ export async function logout() {
   }
   clearTokens();
 }
+
+
+export async function deleteAccount() {
+  const res = await fetch(`${API_BASE}/auth/delete-account/`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${getAccessToken()}` },
+  });
+  if (!res.ok) throw new Error('Failed to delete account');
+  clearTokens();
+}

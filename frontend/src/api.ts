@@ -131,3 +131,21 @@ export async function addCollaborator(boardId: number, username: string) {
   if (!res.ok) throw new Error(data.detail || `Failed to add collaborator: HTTP ${res.status}`);
   return data;
 }
+
+
+export async function leaveBoard(boardId: number) {
+  const res = await apiFetch(`${API_BASE}/boards/${boardId}/leave/`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Failed to leave board: HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function removeCollaborator(boardId: number, username: string) {
+  const res = await apiFetch(`${API_BASE}/boards/${boardId}/remove-collaborator/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || `Failed to remove collaborator: HTTP ${res.status}`);
+  return data;
+}

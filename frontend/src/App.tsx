@@ -4,9 +4,20 @@ import AuthForm from './AuthForm';
 import { isLoggedIn, logout } from './auth';
 import Dashboard from './Dashboard';
 import BoardView from './BoardView';
+import { deleteAccount } from './auth';
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
+
+  async function handleDeleteAccount() {
+    if (!window.confirm('Delete your account permanently? Boards you own will be deleted too. This cannot be undone.')) return;
+    try {
+      await deleteAccount();
+      setLoggedIn(false);
+    } catch {
+      alert('Failed to delete account. Please try again.');
+    }
+  }
 
   if (!loggedIn) {
     return <AuthForm onSuccess={() => setLoggedIn(true)} />;
@@ -18,12 +29,20 @@ function App() {
         <Link to="/" className="text-xl font-semibold text-slate-800 hover:text-blue-600">
           My Boards
         </Link>
-        <button
-          onClick={async () => { await logout(); setLoggedIn(false); }}
-          className="text-sm text-slate-500 hover:text-red-600 transition-colors"
-        >
-          Logout
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleDeleteAccount}
+            className="text-xs text-slate-400 hover:text-red-600 transition-colors"
+          >
+            Delete account
+          </button>
+          <button
+            onClick={async () => { await logout(); setLoggedIn(false); }}
+            className="text-sm text-slate-500 hover:text-red-600 transition-colors"
+          >
+            Logout
+          </button>
+        </div>
       </header>
       <main className="p-6">
         <Routes>

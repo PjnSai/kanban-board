@@ -21,6 +21,7 @@ interface Board {
   name: string;
   lists: List[];
   collaborators: string[];
+  is_owner: boolean;
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE;
