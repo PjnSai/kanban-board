@@ -29,24 +29,24 @@ export async function createBoard(name: string) {
   return res.json();
 }
 
-export async function createList(boardId: number, name: string) {
+export async function createList(boardId: number, name: string, position: number) {
   const res = await apiFetch(`${API_BASE}/lists/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ board: boardId, name, position: 0 }),
+    body: JSON.stringify({ board: boardId, name, position }),
   });
   if (!res.ok) throw new Error(`Failed to create list: HTTP ${res.status}`);
   return res.json();
 }
 
-export async function createCard(listId: number, title: string) {
+export async function createCard(listId: number, title: string, position: number) {
   const res = await apiFetch(`${API_BASE}/cards/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Client-Id': clientId,
     },
-    body: JSON.stringify({ list: listId, title, position: 0 }),
+    body: JSON.stringify({ list: listId, title, position }),
   });
   if (!res.ok) throw new Error(`Failed to create card: HTTP ${res.status}`);
   return res.json();
@@ -96,3 +96,4 @@ export async function deleteCard(cardId: number) {
   const res = await apiFetch(`${API_BASE}/cards/${cardId}/`, { method: 'DELETE' });
   if (!res.ok) throw new Error(`Failed to delete card: HTTP ${res.status}`);
 }
+

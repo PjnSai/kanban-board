@@ -5,6 +5,7 @@ import CardItem from './CardItem';
 interface CardType {
   id: number;
   title: string;
+  position: number;
 }
 
 interface ListColumnProps {
