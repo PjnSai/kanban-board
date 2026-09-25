@@ -5,11 +5,13 @@ import {
 } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { apiFetch } from './apiFetch';
+import { SortableContext, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import {
-  createList, createCard, updateList, updateCardTitle, deleteList, deleteCard, updateCard,
+  createList, createCard, updateList, updateListPosition, updateCardTitle, deleteList, deleteCard, updateCard,
 } from './api';
 import { clientId } from './api';
 import ListColumn from './ListColumn';
+
 
 interface Card {
   id: number;
@@ -46,6 +48,7 @@ function BoardView() {
   const [editCardTitle, setEditCardTitle] = useState('');
 
   const [activeCard, setActiveCard] = useState<Card | null>(null);
+  const [activeColumn, setActiveColumn] = useState<List | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -95,20 +98,62 @@ function BoardView() {
   }, [boardId]);
 
   function handleDragStart(event: DragStartEvent) {
-    const cardId = event.active.id as number;
+    const activeId = event.active.id;
+
+    if (typeof activeId === 'string' && activeId.startsWith('col-')) {
+        const listId = parseInt(activeId.replace('col-', ''), 10);
+        const found = board?.lists.find((l) => l.id === listId);
+        if (found) setActiveColumn(found);
+        return;
+    }
+
+    const cardId = activeId as number;
     for (const list of board?.lists ?? []) {
-      const found = list.cards.find((c) => c.id === cardId);
-      if (found) {
+        const found = list.cards.find((c) => c.id === cardId);
+        if (found) {
         setActiveCard(found);
         return;
-      }
+        }
     }
-  }
+    }
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveCard(null);
+    setActiveColumn(null);
     const { active, over } = event;
     if (!over || !board) return;
+
+    // Column reorder
+    if (typeof active.id === 'string' && active.id.startsWith('col-')) {
+        const activeListId = parseInt(active.id.replace('col-', ''), 10);
+        let overListId: number | null = null;
+
+        if (typeof over.id === 'string' && over.id.startsWith('col-')) {
+        overListId = parseInt(over.id.replace('col-', ''), 10);
+        } else if (typeof over.id === 'string' && over.id.startsWith('list-')) {
+        overListId = parseInt(over.id.replace('list-', ''), 10);
+        } else {
+        const overCardId = over.id as number;
+        const containingList = board.lists.find((l) =>
+            l.cards.some((c) => c.id === overCardId)
+        );
+        if (containingList) overListId = containingList.id;
+        }
+
+        if (overListId === null || activeListId === overListId) return;
+
+        const oldIndex = board.lists.findIndex((l) => l.id === activeListId);
+        const newIndex = board.lists.findIndex((l) => l.id === overListId);
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        const reordered = arrayMove(board.lists, oldIndex, newIndex);
+        setBoard({ ...board, lists: reordered });
+
+        reordered.forEach((list, index) => {
+        updateListPosition(list.id, index).catch(console.error);
+        });
+        return;
+    }
 
     const activeCardId = active.id as number;
     const overId = over.id;
@@ -274,10 +319,11 @@ function BoardView() {
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => setActiveCard(null)}
-        >
-          {board.lists.map((list) => (
-            <ListColumn
+          onDragCancel={() => { setActiveCard(null); setActiveColumn(null); }}
+          >
+          <SortableContext items={board.lists.map((l) => `col-${l.id}`)} strategy={horizontalListSortingStrategy}>
+            {board.lists.map((list) => (
+            <ListColumn   
               key={list.id}
               id={list.id}
               name={list.name}
@@ -299,12 +345,18 @@ function BoardView() {
               onDeleteCard={handleDeleteCard}
             />
           ))}
+          </SortableContext>
           <DragOverlay>
-            {activeCard ? (
-              <div className="bg-white rounded-lg px-3 py-2 shadow-lg border border-blue-300 text-sm text-slate-700 rotate-2">
+            {activeCard && (
+            <div className="bg-white rounded-lg px-3 py-2 shadow-lg border border-blue-300 text-sm text-slate-700 rotate-2">
                 {activeCard.title}
-              </div>
-            ) : null}
+            </div>
+            )}
+            {activeColumn && (
+            <div className="bg-slate-100 rounded-xl p-3 w-72 shadow-lg border border-blue-300 text-sm font-semibold text-slate-600">
+                {activeColumn.name}
+            </div>
+            )}
           </DragOverlay>
         </DndContext>
       </div>

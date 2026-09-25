@@ -82,6 +82,7 @@ export async function updateCardTitle(cardId: number, title: string) {
   return res.json();
 }
 
+
 export async function deleteBoard(boardId: number) {
   const res = await apiFetch(`${API_BASE}/boards/${boardId}/`, { method: 'DELETE' });
   if (!res.ok) throw new Error(`Failed to delete board: HTTP ${res.status}`);
@@ -97,3 +98,12 @@ export async function deleteCard(cardId: number) {
   if (!res.ok) throw new Error(`Failed to delete card: HTTP ${res.status}`);
 }
 
+export async function updateListPosition(listId: number, position: number) {
+  const res = await apiFetch(`${API_BASE}/lists/${listId}/`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ position }),
+  });
+  if (!res.ok) throw new Error(`Failed to update list: HTTP ${res.status}`);
+  return res.json();
+}
