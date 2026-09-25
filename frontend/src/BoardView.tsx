@@ -11,6 +11,8 @@ import {
 } from './api';
 import { clientId } from './api';
 import ListColumn from './ListColumn';
+import.meta.env.VITE_WS_BASE
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 
 interface Card {
@@ -57,7 +59,7 @@ function BoardView() {
   // Fetch this board
   useEffect(() => {
     setLoading(true);
-    apiFetch(`http://localhost:8000/api/boards/${boardId}/`)
+    apiFetch(`${API_BASE}/boards/${boardId}/`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -70,7 +72,7 @@ function BoardView() {
   // WebSocket, scoped to this board
   useEffect(() => {
     if (!boardId) return;
-    const ws = new WebSocket(`ws://localhost:8000/ws/boards/${boardId}/`);
+    const ws = new WebSocket(`${import.meta.env.VITE_WS_BASE}/boards/${boardId}/`);
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);

@@ -1,6 +1,6 @@
 import { apiFetch } from './apiFetch';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 export const clientId = crypto.randomUUID();
 
@@ -105,5 +105,15 @@ export async function updateListPosition(listId: number, position: number) {
     body: JSON.stringify({ position }),
   });
   if (!res.ok) throw new Error(`Failed to update list: HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function updateBoardPosition(boardId: number, position: number) {
+  const res = await apiFetch(`${API_BASE}/boards/${boardId}/`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ position }),
+  });
+  if (!res.ok) throw new Error(`Failed to update board: HTTP ${res.status}`);
   return res.json();
 }

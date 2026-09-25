@@ -35,7 +35,7 @@ class BoardSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Board
-        fields = ['id', 'name', 'owner', 'created_at', 'lists']
+        fields = ['id', 'name', 'owner', 'position', 'created_at', 'lists']
         read_only_fields = ['owner']
 
 class RegisterSerializer(serializers.ModelSerializer):

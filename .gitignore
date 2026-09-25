@@ -11,6 +11,8 @@ frontend/dist/
 frontend/.env
 frontend/node_modules/
 
+
 # Editor
 .vscode/
 *.log
+

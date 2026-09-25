@@ -1,11 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { apiFetch } from './apiFetch';
 import { createBoard, updateBoard, deleteBoard } from './api';
+import SortableBoardRow from './SortableBoardRow';
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+} from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import {
+  SortableContext, verticalListSortingStrategy, arrayMove,
+} from '@dnd-kit/sortable';
+import { updateBoardPosition } from './api';
+
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 interface Board {
   id: number;
   name: string;
+  position: number;
 }
 
 function Dashboard() {
@@ -15,10 +26,13 @@ function Dashboard() {
   const [newBoardName, setNewBoardName] = useState('');
   const [editingBoardId, setEditingBoardId] = useState<number | null>(null);
   const [editBoardName, setEditBoardName] = useState('');
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+
 
   useEffect(() => {
     setLoading(true);
-    apiFetch('http://localhost:8000/api/boards/')
+    apiFetch(`${API_BASE}/boards/`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -44,6 +58,24 @@ function Dashboard() {
     setEditingBoardId(board.id);
     setEditBoardName(board.name);
   }
+
+  function handleDragEnd(event: DragEndEvent) {
+  const { active, over } = event;
+  if (!over || active.id === over.id) return;
+
+  const oldIndex = boards.findIndex((b) => b.id === active.id);
+  const newIndex = boards.findIndex((b) => b.id === over.id);
+  if (oldIndex === -1 || newIndex === -1) return;
+
+  const reordered = arrayMove(boards, oldIndex, newIndex);
+  setBoards(reordered);
+
+  reordered.forEach((board, index) => {
+    updateBoardPosition(board.id, index).catch(console.error);
+  });
+}
+
+  
 
   async function saveEdit(boardId: number) {
     const name = editBoardName.trim();
@@ -97,45 +129,24 @@ function Dashboard() {
         <p className="text-slate-500 text-center py-16">No boards yet — create your first one above.</p>
       )}
 
-      <div className="flex flex-col gap-2">
-        {boards.map((board) => (
-          <div
-            key={board.id}
-            className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-blue-300 transition-colors"
-          >
-            {editingBoardId === board.id ? (
-              <input
-                type="text"
-                value={editBoardName}
-                onChange={(e) => setEditBoardName(e.target.value)}
-                onBlur={() => saveEdit(board.id)}
-                onKeyDown={(e) => e.key === 'Enter' && saveEdit(board.id)}
-                autoFocus
-                className="text-slate-700 border-b border-blue-400 focus:outline-none"
-              />
-            ) : (
-              <Link to={`/boards/${board.id}`} className="text-slate-700 hover:text-blue-600 flex-1">
-                {board.name}
-              </Link>
-            )}
-            <div className="flex items-center gap-2 ml-3">
-              <button
-                onClick={() => startEditing(board)}
-                className="text-xs text-slate-400 hover:text-blue-600"
-              >
-                Rename
-              </button>
-              <button
-                onClick={() => handleDelete(board.id)}
-                className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-600 text-xs"
-                title="Delete board"
-              >
-                ✕
-              </button>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={boards.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+            <div className="flex flex-col gap-2">
+            {boards.map((board) => (
+                <SortableBoardRow
+                key={board.id}
+                board={board}
+                isEditing={editingBoardId === board.id}
+                editValue={editBoardName}
+                onStartEdit={() => startEditing(board)}
+                onEditChange={setEditBoardName}
+                onSaveEdit={() => saveEdit(board.id)}
+                onDelete={() => handleDelete(board.id)}
+                />
+            ))}
             </div>
-          </div>
-        ))}
-      </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }
