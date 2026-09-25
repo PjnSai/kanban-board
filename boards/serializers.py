@@ -11,7 +11,8 @@ class CardSerializer(serializers.ModelSerializer):
 
     def validate_list(self, value):
         request = self.context['request']
-        if value.board.owner != request.user:
+        board = value.board
+        if board.owner != request.user and request.user not in board.collaborators.all():
             raise serializers.ValidationError("You don't have permission to add cards to this list.")
         return value
 
@@ -25,17 +26,18 @@ class ListSerializer(serializers.ModelSerializer):
 
     def validate_board(self, value):
         request = self.context['request']
-        if value.owner != request.user:
+        if value.owner != request.user and request.user not in value.collaborators.all():
             raise serializers.ValidationError("You don't have permission to add lists to this board.")
         return value
 
 
 class BoardSerializer(serializers.ModelSerializer):
     lists = ListSerializer(many=True, read_only=True)
+    collaborators = serializers.SlugRelatedField(many=True, read_only=True, slug_field='username')
 
     class Meta:
         model = Board
-        fields = ['id', 'name', 'owner', 'position', 'created_at', 'lists']
+        fields = ['id', 'name', 'owner', 'position', 'created_at', 'lists', 'collaborators']
         read_only_fields = ['owner']
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -53,3 +55,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         return user        
 
+class CollaboratorSerializer(serializers.Serializer):
+    username = serializers.CharField()
+
+    def validate_username(self, value):
+        try:
+            user = User.objects.get(username=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("No user with that username exists.")
+        return user

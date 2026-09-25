@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 class Board(models.Model):
     name = models.CharField(max_length=200)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='boards')
+    collaborators = models.ManyToManyField(User, related_name='shared_boards', blank=True)
     position = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
