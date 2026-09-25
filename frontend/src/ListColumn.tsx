@@ -83,14 +83,20 @@ function ListColumn({
           ))}
         </SortableContext>
       </div>
-      <form onSubmit={onCreateCard} className="mt-2">
+      <form onSubmit={onCreateCard} className="mt-2 flex gap-1">
         <input
           type="text"
           placeholder="Add a card"
           value={newCardValue}
           onChange={(e) => onNewCardChange(e.target.value)}
-          className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        <button
+          type="submit"
+          className="bg-slate-200 text-slate-600 rounded-lg px-2.5 text-sm hover:bg-slate-300 transition-colors"
+        >
+          +
+        </button>
       </form>
     </div>
   );

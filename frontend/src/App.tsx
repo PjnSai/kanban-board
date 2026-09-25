@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import AuthForm from './AuthForm';
-import { isLoggedIn, clearTokens } from './auth';
+import { isLoggedIn, logout } from './auth';
 import Dashboard from './Dashboard';
 import BoardView from './BoardView';
 
@@ -19,7 +19,7 @@ function App() {
           My Boards
         </Link>
         <button
-          onClick={() => { clearTokens(); setLoggedIn(false); }}
+          onClick={async () => { await logout(); setLoggedIn(false); }}
           className="text-sm text-slate-500 hover:text-red-600 transition-colors"
         >
           Logout

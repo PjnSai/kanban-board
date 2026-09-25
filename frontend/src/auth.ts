@@ -57,9 +57,29 @@ export async function refreshAccessToken(): Promise<boolean> {
 
   const data = await res.json();
   localStorage.setItem('access_token', data.access);
+  if (data.refresh) {
+    localStorage.setItem('refresh_token', data.refresh);
+  }
   return true;
 }
 
 export function isLoggedIn(): boolean {
   return !!getAccessToken();
+}
+
+export async function logout() {
+  const refresh = getRefreshToken();
+  try {
+    await fetch(`${API_BASE}/auth/logout/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getAccessToken()}`,
+      },
+      body: JSON.stringify({ refresh }),
+    });
+  } catch {
+    // fail silently - clearing local tokens still happens regardless
+  }
+  clearTokens();
 }

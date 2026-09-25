@@ -9,6 +9,12 @@ class CardSerializer(serializers.ModelSerializer):
         model = Card
         fields = ['id', 'list', 'title', 'description', 'position', 'created_at']
 
+    def validate_list(self, value):
+        request = self.context['request']
+        if value.board.owner != request.user:
+            raise serializers.ValidationError("You don't have permission to add cards to this list.")
+        return value
+
 
 class ListSerializer(serializers.ModelSerializer):
     cards = CardSerializer(many=True, read_only=True)
@@ -16,6 +22,12 @@ class ListSerializer(serializers.ModelSerializer):
     class Meta:
         model = List
         fields = ['id', 'board', 'name', 'position', 'cards']
+
+    def validate_board(self, value):
+        request = self.context['request']
+        if value.owner != request.user:
+            raise serializers.ValidationError("You don't have permission to add lists to this board.")
+        return value
 
 
 class BoardSerializer(serializers.ModelSerializer):
