@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 ENV SECRET_KEY=build-time-placeholder-not-used-in-production
+ENV DATABASE_URL=postgresql://user:pass@localhost:5432/placeholder
 RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000
