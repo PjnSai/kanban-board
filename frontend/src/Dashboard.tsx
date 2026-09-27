@@ -32,7 +32,6 @@ function Dashboard() {
 
 
   useEffect(() => {
-    setLoading(true);
     apiFetch(`${API_BASE}/boards/`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
