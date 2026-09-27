@@ -40,10 +40,10 @@ jobs:
       - name: Run tests
         run: pytest
         env:
-          SECRET_KEY: ci-placeholder-key
+          SECRET_KEY: ci-placeholder-key-needs-to-be-at-least-32-characters-long
           DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
           DATABASE_SSL_REQUIRED: "False"
-          DEBUG: "False"
+          DEBUG: "True"
 
   frontend-check:
     runs-on: ubuntu-latest
