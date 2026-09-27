@@ -35,12 +35,14 @@ jobs:
         env:
           SECRET_KEY: ci-placeholder-key
           DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+          DATABASE_SSL_REQUIRED: "False"
           DEBUG: "False"
       - name: Run tests
         run: pytest
         env:
           SECRET_KEY: ci-placeholder-key
           DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+          DATABASE_SSL_REQUIRED: "False"
           DEBUG: "False"
 
   frontend-check:
