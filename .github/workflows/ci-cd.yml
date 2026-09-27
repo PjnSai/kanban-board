@@ -9,6 +9,20 @@ on:
 jobs:
   backend-check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,7 +34,13 @@ jobs:
         run: python manage.py check
         env:
           SECRET_KEY: ci-placeholder-key
-          DATABASE_URL: postgresql://user:pass@localhost:5432/placeholder
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+          DEBUG: "False"
+      - name: Run tests
+        run: pytest
+        env:
+          SECRET_KEY: ci-placeholder-key
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
           DEBUG: "False"
 
   frontend-check:
