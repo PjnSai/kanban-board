@@ -5,7 +5,7 @@ import { isLoggedIn, logout } from './auth';
 import Dashboard from './Dashboard';
 import BoardView from './BoardView';
 import { deleteAccount } from './auth';
-// test
+
 function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
 
