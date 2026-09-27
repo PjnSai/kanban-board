@@ -43,10 +43,19 @@ jobs:
           VITE_API_BASE: https://placeholder.example.com/api
           VITE_WS_BASE: wss://placeholder.example.com/ws
 
-  deploy:
+    deploy:
     needs: [backend-check, frontend-check]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Trigger Render deploy
         run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+      - name: Deploy to Vercel
+        working-directory: frontend
+        run: vercel deploy --prod --token="${{ secrets.VERCEL_TOKEN }}" --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
