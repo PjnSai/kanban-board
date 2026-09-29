@@ -4,7 +4,7 @@
 
 A real-time collaborative Kanban board. Create boards, lists, and cards, drag them around, share a board with other users, and see their changes appear live.
 
-**Live demo:** https://kanban-board-topaz-nine.vercel.app
+**Live demo:** https://pjnsai-kanban.vercel.app
 
 > The backend runs on a free hosting tier that sleeps when idle, so the first request after a quiet period can take 30-60 seconds while it wakes up.
 
