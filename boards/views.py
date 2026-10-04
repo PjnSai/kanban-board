@@ -47,6 +47,19 @@ class BoardViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Owner is already on the board.'}, status=400)
 
         board.collaborators.add(user)
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'board_{board.id}',
+            {
+                'type': 'board_message',
+                'message': {
+                    'event': 'collaborator_added',
+                    'username': user.username,
+                    'origin': request.headers.get('X-Client-Id', ''),
+                },
+            }
+        )
         return Response({'detail': f'{user.username} added.'}, status=200)
 
     @action(detail=True, methods=['post'], url_path='leave')
@@ -68,6 +81,19 @@ class BoardViewSet(viewsets.ModelViewSet):
         user = serializer.validated_data['username']
 
         board.collaborators.remove(user)
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'board_{board.id}',
+            {
+                'type': 'board_message',
+                'message': {
+                    'event': 'collaborator_removed',
+                    'username': user.username,
+                    'origin': request.headers.get('X-Client-Id', ''),
+                },
+            }
+        )
         return Response({'detail': f'{user.username} removed.'}, status=200)
 
 
@@ -78,6 +104,27 @@ class ListViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         return List.objects.filter(Q(board__owner=user) | Q(board__collaborators=user)).distinct()
+
+    def perform_create(self, serializer):
+        list_obj = serializer.save()
+        board_id = list_obj.board.id
+        client_id = self.request.headers.get('X-Client-Id', '')
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'board_{board_id}',
+            {
+                'type': 'board_message',
+                'message': {
+                    'event': 'list_created',
+                    'list_id': list_obj.id,
+                    'name': list_obj.name,
+                    'position': list_obj.position,
+                    'origin': client_id,
+                },
+            }
+        )
+
+    
 
     def perform_update(self, serializer):
         list_obj = serializer.save()
@@ -91,11 +138,31 @@ class ListViewSet(viewsets.ModelViewSet):
                 'message': {
                     'event': 'list_moved',
                     'list_id': list_obj.id,
+                    'name': list_obj.name,
                     'position': list_obj.position,
                     'origin': client_id,
                 },
             }
         )
+
+    def perform_destroy(self, instance):
+            board_id = instance.board.id
+            list_id = instance.id
+            client_id = self.request.headers.get('X-Client-Id', '')
+            instance.delete()
+    
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'board_{board_id}',
+                {
+                    'type': 'board_message',
+                    'message': {
+                        'event': 'list_deleted',
+                        'list_id': list_id,
+                        'origin': client_id,
+                    },
+                }
+            )
 
 
 class CardViewSet(viewsets.ModelViewSet):
@@ -105,6 +172,26 @@ class CardViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         return Card.objects.filter(Q(list__board__owner=user) | Q(list__board__collaborators=user)).distinct()
+
+    def perform_create(self, serializer):
+        card = serializer.save()
+        board_id = card.list.board.id
+        client_id = self.request.headers.get('X-Client-Id', '')
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'board_{board_id}',
+            {
+                'type': 'board_message',
+                'message': {
+                    'event': 'card_created',
+                    'card_id': card.id,
+                    'list_id': card.list.id,
+                    'title': card.title,
+                    'position': card.position,
+                    'origin': client_id,
+                },
+            }
+        )
 
     def perform_update(self, serializer):
         card = serializer.save()
@@ -119,7 +206,27 @@ class CardViewSet(viewsets.ModelViewSet):
                     'event': 'card_moved',
                     'card_id': card.id,
                     'list_id': card.list.id,
+                    'title': card.title,
                     'position': card.position,
+                    'origin': client_id,
+                },
+            }
+        )
+
+    def perform_destroy(self, instance):
+        board_id = instance.list.board.id
+        card_id = instance.id
+        client_id = self.request.headers.get('X-Client-Id', '')
+        instance.delete()
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'board_{board_id}',
+            {
+                'type': 'board_message',
+                'message': {
+                    'event': 'card_deleted',
+                    'card_id': card_id,
                     'origin': client_id,
                 },
             }

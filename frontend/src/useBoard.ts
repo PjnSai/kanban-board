@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react';
-import { apiFetch } from './apiFetch';
+import { useState, useEffect } from "react";
+import { apiFetch } from "./apiFetch";
 import {
-  createList, createCard, updateList, updateCardTitle,
-  deleteList, deleteCard, clientId,
-} from './api';
+  createList,
+  createCard,
+  updateList,
+  updateCardTitle,
+  deleteList,
+  deleteCard,
+  clientId,
+} from "./api";
 
 interface Card {
   id: number;
@@ -32,12 +37,14 @@ export function useBoard(boardId: number) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [newListName, setNewListName] = useState('');
-  const [newCardTitle, setNewCardTitle] = useState<{ [listId: number]: string }>({});
+  const [newListName, setNewListName] = useState("");
+  const [newCardTitle, setNewCardTitle] = useState<{
+    [listId: number]: string;
+  }>({});
   const [editingListId, setEditingListId] = useState<number | null>(null);
-  const [editListName, setEditListName] = useState('');
+  const [editListName, setEditListName] = useState("");
   const [editingCardId, setEditingCardId] = useState<number | null>(null);
-  const [editCardTitle, setEditCardTitle] = useState('');
+  const [editCardTitle, setEditCardTitle] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -59,32 +66,119 @@ export function useBoard(boardId: number) {
       const data = JSON.parse(event.data);
       if (data.origin === clientId) return;
 
-      if (data.event === 'card_moved') {
+      if (data.event === "card_moved") {
         setBoard((prev) => {
           if (!prev) return prev;
-          const newLists = prev.lists.map((l) => ({ ...l, cards: [...l.cards] }));
+          const newLists = prev.lists.map((l) => ({
+            ...l,
+            cards: [...l.cards],
+          }));
           let movedCard: Card | undefined;
           newLists.forEach((list) => {
             const idx = list.cards.findIndex((c) => c.id === data.card_id);
             if (idx !== -1) [movedCard] = list.cards.splice(idx, 1);
           });
           if (movedCard) {
+            const updatedCard = { ...movedCard, title: data.title };
             const destList = newLists.find((l) => l.id === data.list_id);
-            destList?.cards.splice(data.position, 0, movedCard);
+            destList?.cards.splice(data.position, 0, updatedCard);
           }
           return { ...prev, lists: newLists };
         });
       }
 
-      if (data.event === 'list_moved') {
+      if (data.event === "list_moved") {
         setBoard((prev) => {
           if (!prev) return prev;
           const list = prev.lists.find((l) => l.id === data.list_id);
           if (!list) return prev;
           const others = prev.lists.filter((l) => l.id !== data.list_id);
           const newLists = [...others];
-          newLists.splice(data.position, 0, list);
+          const updatedList = { ...list, name: data.name };
+          newLists.splice(data.position, 0, updatedList);
           return { ...prev, lists: newLists };
+        });
+      }
+
+      if (data.event === "list_created") {
+        setBoard((prev) => {
+          if (!prev) return prev;
+          if (prev.lists.some((l) => l.id === data.list_id)) return prev;
+          const newList = {
+            id: data.list_id,
+            name: data.name,
+            position: data.position,
+            cards: [],
+          };
+          return { ...prev, lists: [...prev.lists, newList] };
+        });
+      }
+
+      if (data.event === "card_created") {
+        setBoard((prev) => {
+          if (!prev) return prev;
+          const list = prev.lists.find((l) => l.id === data.list_id);
+          if (!list || list.cards.some((c) => c.id === data.card_id))
+            return prev;
+          const newCard = {
+            id: data.card_id,
+            title: data.title,
+            position: data.position,
+          };
+          return {
+            ...prev,
+            lists: prev.lists.map((l) =>
+              l.id === data.list_id
+                ? { ...l, cards: [...l.cards, newCard] }
+                : l,
+            ),
+          };
+        });
+      }
+
+      if (data.event === "list_deleted") {
+        setBoard((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            lists: prev.lists.filter((l) => l.id !== data.list_id),
+          };
+        });
+      }
+
+      if (data.event === "card_deleted") {
+        setBoard((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            lists: prev.lists.map((l) => ({
+              ...l,
+              cards: l.cards.filter((c) => c.id !== data.card_id),
+            })),
+          };
+        });
+      }
+
+      if (data.event === "collaborator_added") {
+        setBoard((prev) => {
+          if (!prev) return prev;
+          if (prev.collaborators.includes(data.username)) return prev;
+          return {
+            ...prev,
+            collaborators: [...prev.collaborators, data.username],
+          };
+        });
+      }
+
+      if (data.event === "collaborator_removed") {
+        setBoard((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            collaborators: prev.collaborators.filter(
+              (c) => c !== data.username,
+            ),
+          };
         });
       }
     };
@@ -99,10 +193,13 @@ export function useBoard(boardId: number) {
     try {
       const position = board.lists.length;
       const newList = await createList(boardId, name, position);
-      setBoard({ ...board, lists: [...board.lists, { ...newList, cards: [] }] });
-      setNewListName('');
+      setBoard({
+        ...board,
+        lists: [...board.lists, { ...newList, cards: [] }],
+      });
+      setNewListName("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create list');
+      setError(err instanceof Error ? err.message : "Failed to create list");
     }
   }
 
@@ -117,12 +214,12 @@ export function useBoard(boardId: number) {
       setBoard({
         ...board,
         lists: board.lists.map((l) =>
-          l.id === listId ? { ...l, cards: [...l.cards, newCard] } : l
+          l.id === listId ? { ...l, cards: [...l.cards, newCard] } : l,
         ),
       });
-      setNewCardTitle((prev) => ({ ...prev, [listId]: '' }));
+      setNewCardTitle((prev) => ({ ...prev, [listId]: "" }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create card');
+      setError(err instanceof Error ? err.message : "Failed to create card");
     }
   }
 
@@ -142,7 +239,7 @@ export function useBoard(boardId: number) {
         lists: board.lists.map((l) => (l.id === listId ? { ...l, name } : l)),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update list');
+      setError(err instanceof Error ? err.message : "Failed to update list");
     }
   }
 
@@ -165,17 +262,17 @@ export function useBoard(boardId: number) {
         })),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update card');
+      setError(err instanceof Error ? err.message : "Failed to update card");
     }
   }
 
   async function handleDeleteList(listId: number) {
-    if (!window.confirm('Delete this list and its cards?') || !board) return;
+    if (!window.confirm("Delete this list and its cards?") || !board) return;
     try {
       await deleteList(listId);
       setBoard({ ...board, lists: board.lists.filter((l) => l.id !== listId) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete list');
+      setError(err instanceof Error ? err.message : "Failed to delete list");
     }
   }
 
@@ -191,18 +288,33 @@ export function useBoard(boardId: number) {
         })),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete card');
+      setError(err instanceof Error ? err.message : "Failed to delete card");
     }
   }
 
   return {
-    board, setBoard, loading, error, setError,
-    newListName, setNewListName, newCardTitle, setNewCardTitle,
-    editingListId, editListName, setEditListName,
-    editingCardId, editCardTitle, setEditCardTitle,
-    handleCreateList, handleCreateCard,
-    startEditingList, saveEditList,
-    startEditingCard, saveEditCard,
-    handleDeleteList, handleDeleteCard,
+    board,
+    setBoard,
+    loading,
+    error,
+    setError,
+    newListName,
+    setNewListName,
+    newCardTitle,
+    setNewCardTitle,
+    editingListId,
+    editListName,
+    setEditListName,
+    editingCardId,
+    editCardTitle,
+    setEditCardTitle,
+    handleCreateList,
+    handleCreateCard,
+    startEditingList,
+    saveEditList,
+    startEditingCard,
+    saveEditCard,
+    handleDeleteList,
+    handleDeleteCard,
   };
 }

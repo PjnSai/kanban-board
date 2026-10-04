@@ -1,8 +1,11 @@
-import { useDroppable } from '@dnd-kit/core';
-import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import CardItem from './CardItem';
-
+import { useDroppable } from "@dnd-kit/core";
+import {
+  useSortable,
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import CardItem from "./CardItem";
 
 interface CardType {
   id: number;
@@ -32,14 +35,33 @@ interface ListColumnProps {
 }
 
 function ListColumn({
-  id, name, cards, newCardValue, onNewCardChange, onCreateCard,
-  isEditing, editValue, onStartEdit, onEditChange, onSaveEdit,
-  editingCardId, editCardTitle, onStartEditCard, onEditCardChange, onSaveEditCard,
-  onDeleteList, onDeleteCard,
+  id,
+  name,
+  cards,
+  newCardValue,
+  onNewCardChange,
+  onCreateCard,
+  isEditing,
+  editValue,
+  onStartEdit,
+  onEditChange,
+  onSaveEdit,
+  editingCardId,
+  editCardTitle,
+  onStartEditCard,
+  onEditCardChange,
+  onSaveEditCard,
+  onDeleteList,
+  onDeleteCard,
 }: ListColumnProps) {
   const { setNodeRef: setDroppableRef } = useDroppable({ id: `list-${id}` });
   const {
-    attributes, listeners, setNodeRef: setSortableRef, transform, transition, isDragging,
+    attributes,
+    listeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+    isDragging,
   } = useSortable({ id: `col-${id}` });
 
   const style = {
@@ -49,10 +71,18 @@ function ListColumn({
   };
 
   return (
-    <div ref={setSortableRef} style={style} className="bg-slate-100 rounded-xl p-3 w-72 flex-shrink-0">
+    <div
+      ref={setSortableRef}
+      style={style}
+      className="bg-slate-100 rounded-xl p-3 w-[85vw] sm:w-72 shrink-0 snap-center"
+    >
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-1 flex-1 min-w-0">
-          <span {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 px-1">
+          <span
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 px-1 touch-none"
+          >
             ⠿
           </span>
           {isEditing ? (
@@ -61,7 +91,7 @@ function ListColumn({
               value={editValue}
               onChange={(e) => onEditChange(e.target.value)}
               onBlur={onSaveEdit}
-              onKeyDown={(e) => e.key === 'Enter' && onSaveEdit()}
+              onKeyDown={(e) => e.key === "Enter" && onSaveEdit()}
               autoFocus
               className="text-sm font-semibold text-slate-600 border-b border-blue-400 focus:outline-none flex-1 min-w-0"
             />
@@ -76,14 +106,17 @@ function ListColumn({
         </div>
         <button
           onClick={onDeleteList}
-          className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-200 text-slate-400 hover:bg-red-100 hover:text-red-600 text-xs flex-shrink-0"
+          className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-200 text-slate-400 hover:bg-red-100 hover:text-red-600 text-xs shrink-0"
           title="Delete list"
         >
           ✕
         </button>
       </div>
-      <div ref={setDroppableRef} className="flex flex-col gap-2 min-h-[40px]">
-        <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+      <div ref={setDroppableRef} className="flex flex-col gap-2 min-h-10">
+        <SortableContext
+          items={cards.map((c) => c.id)}
+          strategy={verticalListSortingStrategy}
+        >
           {cards.map((card) => (
             <CardItem
               key={card.id}
