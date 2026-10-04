@@ -23,6 +23,15 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -34,9 +43,10 @@ jobs:
       - name: Django system check
         run: python manage.py check
         env:
-          SECRET_KEY: ci-placeholder-key
+          SECRET_KEY: ci-placeholder-key-needs-to-be-at-least-32-characters-long
           DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
           DATABASE_SSL_REQUIRED: "False"
+          REDIS_URL: redis://localhost:6379
           DEBUG: "False"
       - name: Run tests
         run: pytest
@@ -44,6 +54,7 @@ jobs:
           SECRET_KEY: ci-placeholder-key-needs-to-be-at-least-32-characters-long
           DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
           DATABASE_SSL_REQUIRED: "False"
+          REDIS_URL: redis://localhost:6379
           DEBUG: "True"
       - name: Check for known vulnerabilities (Python)
         run: pip install pip-audit && pip-audit -r requirements.txt
