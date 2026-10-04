@@ -31,14 +31,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 ASGI_APPLICATION = 'config.asgi.application'
 
+_redis_host_config = {'address': REDIS_URL}
+if REDIS_URL and REDIS_URL.startswith('rediss://'):
+    _redis_host_config['ssl_cert_reqs'] = None
+
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.pubsub.RedisPubSubChannelLayer',
         'CONFIG': {
-            'hosts': [{
-                'address': REDIS_URL,
-                'ssl_cert_reqs': None,
-            }],
+            'hosts': [_redis_host_config],
         },
     },
 }
