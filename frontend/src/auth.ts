@@ -1,42 +1,48 @@
+import { parseJson } from "./api";
+
 const API_BASE = import.meta.env.VITE_API_BASE;
 
 export function getAccessToken(): string | null {
-  return localStorage.getItem('access_token');
+  return localStorage.getItem("access_token");
 }
 
 export function getRefreshToken(): string | null {
-  return localStorage.getItem('refresh_token');
+  return localStorage.getItem("refresh_token");
 }
 
 function storeTokens(access: string, refresh: string) {
-  localStorage.setItem('access_token', access);
-  localStorage.setItem('refresh_token', refresh);
+  localStorage.setItem("access_token", access);
+  localStorage.setItem("refresh_token", refresh);
 }
 
 export function clearTokens() {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
 }
 
 export async function login(username: string, password: string) {
   const res = await fetch(`${API_BASE}/auth/login/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
   });
-  if (!res.ok) throw new Error('Invalid username or password');
-  const data = await res.json();
+  if (!res.ok) throw new Error("Invalid username or password");
+  const data = await parseJson(res);
   storeTokens(data.access, data.refresh);
 }
 
-export async function register(username: string, email: string, password: string) {
+export async function register(
+  username: string,
+  email: string,
+  password: string,
+) {
   const res = await fetch(`${API_BASE}/auth/register/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, email, password }),
   });
   if (!res.ok) {
-    const err = await res.json();
+    const err = await parseJson(res);
     throw new Error(JSON.stringify(err));
   }
   // Registration doesn't log you in automatically - call login right after
@@ -48,17 +54,17 @@ export async function refreshAccessToken(): Promise<boolean> {
   if (!refresh) return false;
 
   const res = await fetch(`${API_BASE}/auth/refresh/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refresh }),
   });
 
   if (!res.ok) return false;
 
-  const data = await res.json();
-  localStorage.setItem('access_token', data.access);
+  const data = await parseJson(res);
+  localStorage.setItem("access_token", data.access);
   if (data.refresh) {
-    localStorage.setItem('refresh_token', data.refresh);
+    localStorage.setItem("refresh_token", data.refresh);
   }
   return true;
 }
@@ -71,9 +77,9 @@ export async function logout() {
   const refresh = getRefreshToken();
   try {
     await fetch(`${API_BASE}/auth/logout/`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({ refresh }),
@@ -84,12 +90,11 @@ export async function logout() {
   clearTokens();
 }
 
-
 export async function deleteAccount() {
   const res = await fetch(`${API_BASE}/auth/delete-account/`, {
-    method: 'DELETE',
+    method: "DELETE",
     headers: { Authorization: `Bearer ${getAccessToken()}` },
   });
-  if (!res.ok) throw new Error('Failed to delete account');
+  if (!res.ok) throw new Error("Failed to delete account");
   clearTokens();
 }

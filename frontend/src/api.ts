@@ -2,6 +2,14 @@ import { apiFetch } from "./apiFetch";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
+export async function parseJson(res: Response) {
+  try {
+    return await res.json();
+  } catch {
+    return { detail: "Something went wrong. Please try again." };
+  }
+}
+
 function generateClientId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -198,5 +206,32 @@ export async function removeCollaborator(boardId: number, username: string) {
     throw new Error(
       data.detail || `Failed to remove collaborator: HTTP ${res.status}`,
     );
+  return data;
+}
+
+export async function requestPasswordReset(email: string) {
+  const res = await fetch(`${API_BASE}/auth/password-reset/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = await parseJson(res);
+  if (!res.ok)
+    throw new Error(data.detail || "Failed to request password reset");
+  return data;
+}
+
+export async function confirmPasswordReset(
+  uid: string,
+  token: string,
+  newPassword: string,
+) {
+  const res = await fetch(`${API_BASE}/auth/password-reset-confirm/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uid, token, new_password: newPassword }),
+  });
+  const data = await parseJson(res);
+  if (!res.ok) throw new Error(data.detail || "Failed to reset password");
   return data;
 }

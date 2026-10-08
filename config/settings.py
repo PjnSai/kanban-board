@@ -35,6 +35,9 @@ _redis_host_config = {'address': REDIS_URL}
 if REDIS_URL and REDIS_URL.startswith('rediss://'):
     _redis_host_config['ssl_cert_reqs'] = None
 
+
+
+
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.pubsub.RedisPubSubChannelLayer',
@@ -62,6 +65,32 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+
+
+USE_REAL_EMAIL = os.environ.get('USE_REAL_EMAIL', 'False') == 'True'
+
+if USE_REAL_EMAIL:
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+            'OPTIONS': {
+                'host': os.environ.get('EMAIL_HOST'),
+                'port': int(os.environ.get('EMAIL_PORT', 587)),
+                'use_tls': True,
+                'username': os.environ.get('EMAIL_HOST_USER'),
+                'password': os.environ.get('EMAIL_HOST_PASSWORD'),
+            },
+        }
+    }
+else:
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+        }
+    }
+
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@example.com')
+
 
 
 if not DEBUG:
@@ -121,6 +150,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '20/minute',
+        'password_reset': '5/hour',
     },
 }
 
@@ -196,11 +226,6 @@ STATIC_URL = 'static/'
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
 
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS', 'http://localhost:5173'
