@@ -340,7 +340,7 @@ class PasswordResetRequestView(APIView):
             token = default_token_generator.make_token(user)
             reset_link = f'{frontend_url}/reset-password/{uid}/{token}/'
 
-            # plain_message and html_message stay exactly as you have them
+            # plain_message and html_message 
 
             
             plain_message = f'Click the link to reset your password: {reset_link}\n\nThis link expires in 20 minutes. If you did not request this, ignore this email.'
