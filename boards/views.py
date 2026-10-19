@@ -23,11 +23,22 @@ from datetime import date
 from rest_framework.throttling import AnonRateThrottle
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from rest_framework_simplejwt.token_blacklist.models import (
+    OutstandingToken,
+    BlacklistedToken,
+)
 import os
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from django.core.cache import cache
+from django.utils import timezone
 
 DAILY_EMAIL_LIMIT = 300
+
+def within_daily_limit(email, limit=5):
+    key = f"pwreset:daily:{email.lower()}:{timezone.now().date()}"
+    cache.add(key, 0, timeout=86400)
+    return cache.incr(key) <= limit
 
 def _email_quota_exceeded():
     key = f'password_reset_count:{date.today().isoformat()}'
@@ -292,7 +303,7 @@ class PasswordResetRequestView(APIView):
     throttle_classes = [PasswordResetThrottle]
 
     def post(self, request):
-        email = request.data.get('email', '').strip()
+        email = request.data.get('email', '').strip().lower()
         generic_response = Response(
             {'detail': 'If that email is registered, a reset link has been sent.'},
             status=200
@@ -313,36 +324,46 @@ class PasswordResetRequestView(APIView):
                 status=429
             )
 
-        try:
-            user = User.objects.get(email__iexact=email)
-        except User.DoesNotExist:
+        # Applies to every email, registered or not, so responses never reveal which exist
+        cache.set(_cooldown_key(email), True, timeout=60)
+
+        if not within_daily_limit(email):
+            return generic_response
+        users = User.objects.filter(email__iexact=email, is_active=True)
+        if not users.exists():
             return generic_response
 
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
-        frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
-        reset_link = f'{frontend_url}/reset-password/{uid}/{token}/'
+        frontend_url = os.environ['FRONTEND_URL']
 
-        plain_message = f'Click the link to reset your password: {reset_link}\n\nIf you did not request this, ignore this email.'
-        html_message = f'''
-        <p>We received a request to reset your Kanban Board password.</p>
-        <p><a href="{reset_link}" style="background:#2563eb;color:#ffffff;padding:10px 20px;border-radius:8px;text-decoration:none;display:inline-block;">Reset your password</a></p>
-        <p>Or copy and paste this link into your browser:<br>{reset_link}</p>
-        <p style="color:#64748b;font-size:13px;">If you did not request this, you can safely ignore this email.</p>
-        '''
+        for user in users:
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            reset_link = f'{frontend_url}/reset-password/{uid}/{token}/'
 
-        email_message = EmailMultiAlternatives(
-            subject='Reset your Kanban Board password',
-            body=plain_message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[user.email],
-        )
-        email_message.attach_alternative(html_message, 'text/html')
-        email_message.send()
+            # plain_message and html_message stay exactly as you have them
 
-        cache.set(_cooldown_key(email), True, timeout=60)
-        _increment_email_quota()
+            
+            plain_message = f'Click the link to reset your password: {reset_link}\n\nThis link expires in 20 minutes. If you did not request this, ignore this email.'
+            html_message = f'''
+            <p>We received a request to reset your Kanban Board password.</p>
+            <p><a href="{reset_link}" style="background:#2563eb;color:#ffffff;padding:10px 20px;border-radius:8px;text-decoration:none;display:inline-block;">Reset your password</a></p>
+            <p>Or copy and paste this link into your browser:<br>{reset_link}</p>
+            <p style="color:#64748b;font-size:13px;">This link expires in 20 minutes. If you did not request this, you can safely ignore this email.</p>
+            '''
+
+            email_message = EmailMultiAlternatives(
+                subject='Reset your Kanban Board password',
+                body=plain_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[user.email],
+            )
+            email_message.attach_alternative(html_message, 'text/html')
+            email_message.send()
+            _increment_email_quota()
+
         return generic_response
+
+
 
 
 class PasswordResetConfirmView(APIView):
@@ -372,4 +393,10 @@ class PasswordResetConfirmView(APIView):
 
         user.set_password(new_password)
         user.save()
+
+        tokens = OutstandingToken.objects.filter(user=user).exclude(blacklistedtoken__isnull=False)
+        BlacklistedToken.objects.bulk_create(
+            [BlacklistedToken(token=t) for t in tokens],
+            ignore_conflicts=True,
+        )
         return Response({'detail': 'Password has been reset successfully.'}, status=200)
