@@ -1,4 +1,4 @@
-import { parseJson } from "./api";
+import { parseJson, formatApiError } from "./api";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -43,7 +43,7 @@ export async function register(
   });
   if (!res.ok) {
     const err = await parseJson(res);
-    throw new Error(JSON.stringify(err));
+    throw new Error(formatApiError(err));
   }
   // Registration doesn't log you in automatically - call login right after
   await login(username, password);

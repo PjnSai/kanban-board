@@ -9,6 +9,7 @@ function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,12 +24,16 @@ function ResetPasswordPage() {
       return;
     }
 
+    if (submitting) return;
+    setSubmitting(true);
     try {
       await confirmPasswordReset(uid, token, newPassword);
       setSuccess(true);
       setTimeout(() => navigate("/"), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -64,9 +69,10 @@ function ResetPasswordPage() {
             {error && <p className="text-red-600 text-sm">{error}</p>}
             <button
               type="submit"
-              className="bg-blue-600 text-white rounded-lg py-2 font-medium hover:bg-blue-700 transition-colors"
+              disabled={submitting}
+              className="bg-blue-600 text-white rounded-lg py-2 font-medium hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Reset password
+              {submitting ? "Saving..." : "Reset password"}
             </button>
           </form>
         )}

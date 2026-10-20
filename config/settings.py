@@ -148,11 +148,16 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
     ],
+    'NUM_PROXIES': 1,
     'DEFAULT_THROTTLE_RATES': {
         'anon': '20/minute',
         'password_reset': '5/hour',
     },
 }
+
+
+
+
 
 ROOT_URLCONF = 'config.urls'
 
@@ -204,6 +209,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+PASSWORD_RESET_TIMEOUT = 1200
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/

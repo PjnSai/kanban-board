@@ -10,6 +10,17 @@ export async function parseJson(res: Response) {
   }
 }
 
+export function formatApiError(
+  data: unknown,
+  fallback = "Something went wrong. Please try again.",
+): string {
+  if (!data || typeof data !== "object") return fallback;
+  const messages = Object.values(data as Record<string, unknown>)
+    .flatMap((v) => (Array.isArray(v) ? v : [v]))
+    .filter((m): m is string => typeof m === "string");
+  return messages.length ? messages.join(" ") : fallback;
+}
+
 function generateClientId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -232,6 +243,7 @@ export async function confirmPasswordReset(
     body: JSON.stringify({ uid, token, new_password: newPassword }),
   });
   const data = await parseJson(res);
-  if (!res.ok) throw new Error(data.detail || "Failed to reset password");
+  if (!res.ok)
+    throw new Error(formatApiError(data, "Failed to reset password"));
   return data;
 }
