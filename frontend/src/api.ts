@@ -247,3 +247,50 @@ export async function confirmPasswordReset(
     throw new Error(formatApiError(data, "Failed to reset password"));
   return data;
 }
+
+export interface Me {
+  id: number;
+  username: string;
+  email: string;
+  date_joined: string;
+  boards_owned: number;
+}
+
+export async function getMe(): Promise<Me> {
+  const res = await apiFetch(`${API_BASE}/auth/me/`, { method: "GET" });
+  const data = await parseJson(res);
+  if (!res.ok)
+    throw new Error(formatApiError(data, "Failed to load your profile"));
+  return data;
+}
+
+export async function changeEmail(
+  email: string,
+  password: string,
+): Promise<string> {
+  const res = await apiFetch(`${API_BASE}/auth/change-email/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await parseJson(res);
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to change email"));
+  return data.email;
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+) {
+  const res = await apiFetch(`${API_BASE}/auth/change-password/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  });
+  const data = await parseJson(res);
+  if (!res.ok)
+    throw new Error(formatApiError(data, "Failed to change password"));
+}

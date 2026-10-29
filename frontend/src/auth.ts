@@ -1,4 +1,5 @@
 import { parseJson, formatApiError } from "./api";
+import { apiFetch } from "./apiFetch";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -26,6 +27,10 @@ export async function login(username: string, password: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
   });
+  if (res.status === 429)
+    throw new Error(
+      "Too many login attempts. Please wait a while and try again.",
+    );
   if (!res.ok) throw new Error("Invalid username or password");
   const data = await parseJson(res);
   storeTokens(data.access, data.refresh);
@@ -90,11 +95,15 @@ export async function logout() {
   clearTokens();
 }
 
-export async function deleteAccount() {
-  const res = await fetch(`${API_BASE}/auth/delete-account/`, {
+export async function deleteAccount(password: string) {
+  const res = await apiFetch(`${API_BASE}/auth/delete-account/`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${getAccessToken()}` },
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
   });
-  if (!res.ok) throw new Error("Failed to delete account");
+  if (!res.ok) {
+    const err = await parseJson(res);
+    throw new Error(formatApiError(err, "Failed to delete account"));
+  }
   clearTokens();
 }
