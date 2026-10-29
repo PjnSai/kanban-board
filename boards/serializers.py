@@ -6,8 +6,14 @@ from django.contrib.auth.password_validation import validate_password
 
 class CardSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Card
-        fields = ['id', 'list', 'title', 'description', 'position', 'created_at']
+        model = User
+        fields = ['username', 'email', 'password']
+        extra_kwargs = {'email': {'required': True, 'allow_blank': False}}
+
+    def validate_username(self, value):
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("A user with that username already exists.")
+        return value
 
     def validate_list(self, value):
         request = self.context['request']

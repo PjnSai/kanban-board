@@ -32,6 +32,10 @@ from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.core.cache import cache
 from django.utils import timezone
+from rest_framework.throttling import AnonRateThrottle, ScopedRateThrottle, SimpleRateThrottle
+from django.core.validators import validate_email as django_validate_email
+import logging
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 DAILY_EMAIL_LIMIT = 300
 
@@ -291,10 +295,130 @@ class LogoutView(APIView):
 
 class DeleteAccountView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'account_sensitive'
 
     def delete(self, request):
+        if not request.user.check_password(request.data.get('password', '')):
+            return Response({'detail': 'Your password is incorrect.'}, status=400)
         request.user.delete()
         return Response(status=204)
+
+logger = logging.getLogger(__name__)
+
+
+def _mask_email(email):
+    name, _, domain = email.partition('@')
+    return f"{name[:1]}***@{domain}" if name else email
+
+
+def _send_security_notice(to_email, subject, message):
+    # A failed or skipped notice must never break the change itself
+    if _email_quota_exceeded():
+        return
+    try:
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [to_email])
+        _increment_email_quota()
+    except Exception:
+        logger.exception('Failed to send security notice')
+
+class LoginThrottle(SimpleRateThrottle):
+    scope = 'login'
+
+    def get_cache_key(self, request, view):
+        username = str(request.data.get('username', '')).lower()[:150]
+        ident = f'{self.get_ident(request)}:{username}'
+        return self.cache_format % {'scope': self.scope, 'ident': ident}
+
+
+class LoginView(TokenObtainPairView):
+    throttle_classes = [AnonRateThrottle, LoginThrottle]
+
+class MeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        return Response({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'date_joined': user.date_joined,
+            'boards_owned': Board.objects.filter(owner=user).count(),
+        })
+
+
+class ChangeEmailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'account_sensitive'
+
+    def post(self, request):
+        user = request.user
+        password = request.data.get('password', '')
+        new_email = request.data.get('email', '').strip().lower()
+
+        if not user.check_password(password):
+            return Response({'detail': 'Your password is incorrect.'}, status=400)
+
+        try:
+            django_validate_email(new_email)
+        except ValidationError:
+            return Response({'detail': 'Enter a valid email address.'}, status=400)
+
+        if User.objects.filter(email__iexact=new_email).exclude(pk=user.pk).exists():
+            return Response({'detail': 'A user with that email already exists.'}, status=400)
+
+        old_email = user.email
+        user.email = new_email
+        user.save(update_fields=['email'])
+
+        if old_email:
+            _send_security_notice(
+                old_email,
+                'Your Kanban Board email address was changed',
+                f'The email address on your Kanban Board account "{user.username}" was changed to {_mask_email(new_email)}.\n\n'
+                'If you made this change, no action is needed. If you did not, someone else may have access to your account, so please contact the site owner.',
+            )
+        return Response({'email': user.email}, status=200)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'account_sensitive'
+
+    def post(self, request):
+        user = request.user
+        current_password = request.data.get('current_password', '')
+        new_password = request.data.get('new_password', '')
+
+        if not current_password or not new_password:
+            return Response({'detail': 'Please fill in both password fields.'}, status=400)
+
+        if not user.check_password(current_password):
+            return Response({'detail': 'Your current password is incorrect.'}, status=400)
+
+        if current_password == new_password:
+            return Response({'detail': 'Your new password must be different from the current one.'}, status=400)
+
+        try:
+            validate_password(new_password, user)
+        except ValidationError as e:
+            return Response({'detail': e.messages}, status=400)
+
+        user.set_password(new_password)
+        user.save()
+        _revoke_refresh_tokens(user)
+
+        if user.email:
+            _send_security_notice(
+                user.email,
+                'Your Kanban Board password was changed',
+                f'The password for your Kanban Board account "{user.username}" was just changed, and you were logged out of all devices.\n\n'
+                'If this was you, no action is needed. If not, use "Forgot your password?" on the login page to reset it straight away.',
+            )
+        return Response({'detail': 'Password changed. Please log in again.'}, status=200)
 
 
 
@@ -364,7 +488,12 @@ class PasswordResetRequestView(APIView):
         return generic_response
 
 
-
+def _revoke_refresh_tokens(user):
+    tokens = OutstandingToken.objects.filter(user=user).exclude(blacklistedtoken__isnull=False)
+    BlacklistedToken.objects.bulk_create(
+        [BlacklistedToken(token=t) for t in tokens],
+        ignore_conflicts=True,
+    )
 
 class PasswordResetConfirmView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -394,9 +523,5 @@ class PasswordResetConfirmView(APIView):
         user.set_password(new_password)
         user.save()
 
-        tokens = OutstandingToken.objects.filter(user=user).exclude(blacklistedtoken__isnull=False)
-        BlacklistedToken.objects.bulk_create(
-            [BlacklistedToken(token=t) for t in tokens],
-            ignore_conflicts=True,
-        )
+        _revoke_refresh_tokens(user)
         return Response({'detail': 'Password has been reset successfully.'}, status=200)

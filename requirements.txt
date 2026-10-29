@@ -1,6 +1,6 @@
 asgiref==3.12.1
 attrs==26.1.0
-autobahn==26.7.1
+autobahn==26.10.1
 Automat==25.4.16
 cbor2==6.1.5
 cffi==2.1.1
@@ -14,7 +14,7 @@ dj-database-url==3.1.2
 Django==6.1.1
 django-cors-headers==4.9.0
 django-csp==4.0
-djangorestframework==3.18.1
+djangorestframework==3.18.2
 djangorestframework_simplejwt==5.5.1
 hyperlink==21.0.0
 idna==3.20
@@ -34,7 +34,7 @@ python-dotenv==1.2.4
 redis==8.1.0
 service-identity==26.1.0
 sqlparse==0.6.0
-Twisted==26.4.0
+twisted==26.10.0rc1
 txaio==26.6.1
 typing_extensions==4.16.0
 tzdata==2026.4

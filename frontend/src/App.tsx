@@ -4,26 +4,11 @@ import AuthForm from "./AuthForm";
 import { isLoggedIn, logout } from "./auth";
 import Dashboard from "./Dashboard";
 import BoardView from "./BoardView";
-import { deleteAccount } from "./auth";
 import ResetPasswordPage from "./ResetPasswordPage";
+import ProfilePage from "./ProfilePage";
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
-
-  async function handleDeleteAccount() {
-    if (
-      !window.confirm(
-        "Delete your account permanently? Boards you own will be deleted too. This cannot be undone.",
-      )
-    )
-      return;
-    try {
-      await deleteAccount();
-      setLoggedIn(false);
-    } catch {
-      alert("Failed to delete account. Please try again.");
-    }
-  }
 
   if (!loggedIn) {
     return (
@@ -49,13 +34,13 @@ function App() {
         >
           My Boards
         </Link>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleDeleteAccount}
-            className="text-xs text-slate-400 hover:text-red-600 transition-colors"
+        <div className="flex items-center gap-4">
+          <Link
+            to="/profile"
+            className="text-sm text-slate-500 hover:text-blue-600 transition-colors"
           >
-            Delete account
-          </button>
+            Profile
+          </Link>
           <button
             onClick={async () => {
               await logout();
@@ -71,6 +56,10 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/boards/:id" element={<BoardView />} />
+          <Route
+            path="/profile"
+            element={<ProfilePage onLoggedOut={() => setLoggedIn(false)} />}
+          />
         </Routes>
       </main>
     </div>
