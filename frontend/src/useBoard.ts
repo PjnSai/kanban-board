@@ -8,6 +8,7 @@ import {
   deleteList,
   deleteCard,
   clientId,
+  getWsTicket,
 } from "./api";
 
 interface Card {
@@ -60,9 +61,10 @@ export function useBoard(boardId: number) {
 
   useEffect(() => {
     if (!boardId) return;
-    const ws = new WebSocket(`${WS_BASE}/boards/${boardId}/`);
+    let ws: WebSocket | undefined;
+    let cancelled = false;
 
-    ws.onmessage = (event) => {
+    const handleMessage = (event: MessageEvent) => {
       const data = JSON.parse(event.data);
       if (data.origin === clientId) return;
 
@@ -183,7 +185,22 @@ export function useBoard(boardId: number) {
       }
     };
 
-    return () => ws.close();
+    getWsTicket(boardId)
+      .then((ticket) => {
+        if (cancelled) return;
+        ws = new WebSocket(
+          `${WS_BASE}/boards/${boardId}/?ticket=${encodeURIComponent(ticket)}`,
+        );
+        ws.onmessage = handleMessage;
+      })
+      .catch(() => {
+        // not a member, or session expired: no live updates
+      });
+
+    return () => {
+      cancelled = true;
+      ws?.close();
+    };
   }, [boardId]);
 
   async function handleCreateList(e: React.FormEvent) {
