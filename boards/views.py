@@ -276,6 +276,10 @@ class CardViewSet(viewsets.ModelViewSet):
         )
 
 class RegisterView(generics.CreateAPIView):
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'register'
+    
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]

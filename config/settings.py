@@ -154,6 +154,7 @@ REST_FRAMEWORK = {
         'password_reset': '5/hour',
         'account_sensitive': '5/hour',
         'login': '10/hour',
+        'register': '10/hour'
     },
 }
 
