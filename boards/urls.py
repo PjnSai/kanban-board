@@ -1,5 +1,5 @@
 from rest_framework.routers import DefaultRouter
-from .views import BoardViewSet, ListViewSet, CardViewSet, RegisterView, LogoutView, DeleteAccountView, PasswordResetRequestView, PasswordResetConfirmView, MeView, ChangeEmailView, ChangePasswordView
+from .views import BoardViewSet, ListViewSet, CardViewSet, RegisterView, LogoutView, DeleteAccountView, PasswordResetRequestView, PasswordResetConfirmView, MeView, ChangeEmailView, ChangePasswordView, WebSocketTicketView
 from django.urls import path
  
 
@@ -18,4 +18,5 @@ urlpatterns = router.urls + [
     path('auth/me/', MeView.as_view(), name='me'),
     path('auth/change-email/', ChangeEmailView.as_view(), name='change-email'),
     path('auth/change-password/', ChangePasswordView.as_view(), name='change-password'),
+    path('boards/<int:board_id>/ws-ticket/', WebSocketTicketView.as_view(), name='ws-ticket'),
 ]
