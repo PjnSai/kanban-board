@@ -156,6 +156,9 @@ REST_FRAMEWORK = {
         'login': '10/hour',
         'register': '5/hour'
     },
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    ),
 }
 
 
