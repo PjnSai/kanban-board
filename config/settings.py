@@ -103,6 +103,9 @@ if not DEBUG:
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
+# Preload applies to the whole onrender.com domain, which we don't own
+SILENCED_SYSTEM_CHECKS = ['security.W021']
+
 
 # Application definition
 
