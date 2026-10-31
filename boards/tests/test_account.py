@@ -282,3 +282,22 @@ def test_login_is_throttled_per_username(api_client, user_alice, user_bob):
         'username': 'bob', 'password': 'wrong',
     }, format='json')
     assert response.status_code == 401
+
+@pytest.mark.django_db
+def test_register_is_throttled(api_client):
+    limit = int(settings.REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']['register'].split('/')[0])
+
+    for i in range(limit):
+        response = api_client.post('/api/auth/register/', {
+            'username': f'user{i}',
+            'email': f'user{i}@example.com',
+            'password': STRONG_PASSWORD,
+        }, format='json')
+        assert response.status_code == 201
+
+    response = api_client.post('/api/auth/register/', {
+        'username': 'one-too-many',
+        'email': 'toomany@example.com',
+        'password': STRONG_PASSWORD,
+    }, format='json')
+    assert response.status_code == 429
