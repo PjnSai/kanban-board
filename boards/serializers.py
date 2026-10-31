@@ -6,14 +6,8 @@ from django.contrib.auth.password_validation import validate_password
 
 class CardSerializer(serializers.ModelSerializer):
     class Meta:
-        model = User
-        fields = ['username', 'email', 'password']
-        extra_kwargs = {'email': {'required': True, 'allow_blank': False}}
-
-    def validate_username(self, value):
-        if User.objects.filter(username__iexact=value).exists():
-            raise serializers.ValidationError("A user with that username already exists.")
-        return value
+        model = Card
+        fields = ['id', 'list', 'title', 'description', 'position', 'created_at']
 
     def validate_list(self, value):
         request = self.context['request']
@@ -57,19 +51,24 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username', 'email', 'password']
+        extra_kwargs = {'email': {'required': True, 'allow_blank': False}}
+
+    def validate_username(self, value):
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("A user with that username already exists.")
+        return value
 
     def validate_email(self, value):
-        if value and User.objects.filter(email__iexact=value).exists():
+        if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("A user with that email already exists.")
         return value
 
     def create(self, validated_data):
-        user = User.objects.create_user(
+        return User.objects.create_user(
             username=validated_data['username'],
             email=validated_data.get('email', ''),
             password=validated_data['password'],
         )
-        return user        
 
 class CollaboratorSerializer(serializers.Serializer):
     username = serializers.CharField()
