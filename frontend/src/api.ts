@@ -294,3 +294,13 @@ export async function changePassword(
   if (!res.ok)
     throw new Error(formatApiError(data, "Failed to change password"));
 }
+
+export async function getWsTicket(boardId: string | number): Promise<string> {
+  const res = await apiFetch(`${API_BASE}/boards/${boardId}/ws-ticket/`, {
+    method: "GET",
+  });
+  const data = await parseJson(res);
+  if (!res.ok)
+    throw new Error(formatApiError(data, "Could not open live updates"));
+  return data.ticket;
+}
