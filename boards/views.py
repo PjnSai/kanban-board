@@ -36,6 +36,7 @@ from rest_framework.throttling import AnonRateThrottle, ScopedRateThrottle, Simp
 from django.core.validators import validate_email as django_validate_email
 import logging
 from rest_framework_simplejwt.views import TokenObtainPairView
+from django.core import signing
 
 DAILY_EMAIL_LIMIT = 300
 
@@ -279,7 +280,7 @@ class RegisterView(generics.CreateAPIView):
 
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'register'
-    
+
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
@@ -337,6 +338,20 @@ class LoginThrottle(SimpleRateThrottle):
 
 class LoginView(TokenObtainPairView):
     throttle_classes = [AnonRateThrottle, LoginThrottle]
+
+class WebSocketTicketView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, board_id):
+        board = Board.objects.filter(
+            Q(owner=request.user) | Q(collaborators=request.user), pk=board_id
+        ).distinct().first()
+        if board is None:
+            return Response({'detail': 'Not found.'}, status=404)
+        ticket = signing.dumps(
+            {'user': request.user.id, 'board': board.id}, salt='ws-ticket'
+        )
+        return Response({'ticket': ticket})
 
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
