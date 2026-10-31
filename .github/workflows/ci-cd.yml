@@ -1,11 +1,14 @@
 name: CI/CD
 
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
+permissions:
+  contents: read
+  
 jobs:
   backend-check:
     runs-on: ubuntu-latest
