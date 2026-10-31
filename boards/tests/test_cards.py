@@ -94,3 +94,17 @@ def test_board_detail_includes_its_cards(api_client, alice):
 
     assert response.status_code == 200
     assert response.data['lists'][0]['cards'][0]['title'] == 'Task'
+
+
+@pytest.mark.django_db
+def test_card_description_is_saved_and_returned(api_client, alice):
+    board = Board.objects.create(name='B', owner=alice)
+    lst = List.objects.create(board=board, name='To do', position=0)
+
+    authenticate(api_client, alice)
+    response = api_client.post('/api/cards/', {
+        'list': lst.id, 'title': 'Task', 'description': 'Some detail', 'position': 0,
+    }, format='json')
+
+    assert response.status_code == 201
+    assert response.data['description'] == 'Some detail'

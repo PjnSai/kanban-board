@@ -7,7 +7,7 @@ from django.contrib.auth.password_validation import validate_password
 class CardSerializer(serializers.ModelSerializer):
     class Meta:
         model = Card
-        fields = ['id', 'list', 'title', 'position']
+        fields = ['id', 'list', 'title', 'description', 'position', 'created_at']
 
     def validate_list(self, value):
         request = self.context['request']
