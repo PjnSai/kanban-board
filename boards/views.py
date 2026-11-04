@@ -83,36 +83,6 @@ class BoardViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
-    @action(detail=True, methods=['post'], url_path='add-collaborator')
-    def add_collaborator(self, request, pk=None):
-        board = self.get_object()
-        if board.owner != request.user:
-            return Response({'detail': 'Only the owner can add collaborators.'}, status=403)
-
-        serializer = CollaboratorSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['username']
-
-        if user == board.owner:
-            return Response({'detail': 'Owner is already on the board.'}, status=400)
-
-        board.collaborators.add(user)        
-        BoardMembership.objects.get_or_create(board=board, user=user, defaults={'role': 'editor'})
-
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f'board_{board.id}',
-            {
-                'type': 'board_message',
-                'message': {
-                    'event': 'collaborator_added',
-                    'username': user.username,
-                    'origin': request.headers.get('X-Client-Id', ''),
-                },
-            }
-        )
-        return Response({'detail': f'{user.username} added.'}, status=200)
-
     @action(detail=True, methods=['post'], url_path='leave')
     def leave(self, request, pk=None):
         board = self.get_object()

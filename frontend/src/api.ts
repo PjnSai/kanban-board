@@ -181,26 +181,6 @@ export async function updateBoardPosition(boardId: number, position: number) {
   return res.json();
 }
 
-export async function addCollaborator(boardId: number, username: string) {
-  const res = await apiFetch(
-    `${API_BASE}/boards/${boardId}/add-collaborator/`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Client-Id": clientId,
-      },
-      body: JSON.stringify({ username }),
-    },
-  );
-  const data = await res.json();
-  if (!res.ok)
-    throw new Error(
-      data.detail || `Failed to add collaborator: HTTP ${res.status}`,
-    );
-  return data;
-}
-
 export async function leaveBoard(boardId: number) {
   const res = await apiFetch(`${API_BASE}/boards/${boardId}/leave/`, {
     method: "POST",
