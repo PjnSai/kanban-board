@@ -1,16 +1,22 @@
-import { useState, useEffect } from 'react';
-import { apiFetch } from './apiFetch';
-import { createBoard, updateBoard, deleteBoard } from './api';
-import SortableBoardRow from './SortableBoardRow';
+import { useState, useEffect } from "react";
+import { apiFetch } from "./apiFetch";
+import { createBoard, updateBoard, deleteBoard } from "./api";
+import SortableBoardRow from "./SortableBoardRow";
 import {
-  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
-} from '@dnd-kit/core';
-import type { DragEndEvent } from '@dnd-kit/core';
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
 import {
-  SortableContext, verticalListSortingStrategy, arrayMove,
-} from '@dnd-kit/sortable';
-import { updateBoardPosition } from './api';
-import { leaveBoard } from './api';
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { updateBoardPosition } from "./api";
+import { leaveBoard } from "./api";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -20,16 +26,26 @@ interface Board {
   position: number;
   is_owner: boolean;
 }
+
+type View = "all" | "mine" | "shared";
+
 function Dashboard() {
   const [boards, setBoards] = useState<Board[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [newBoardName, setNewBoardName] = useState('');
+  const [newBoardName, setNewBoardName] = useState("");
   const [editingBoardId, setEditingBoardId] = useState<number | null>(null);
-  const [editBoardName, setEditBoardName] = useState('');
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const [editBoardName, setEditBoardName] = useState("");
+  const [view, setView] = useState<View>("all");
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
 
-
+  const visibleBoards = boards.filter((b) =>
+    view === "all" ? true : view === "mine" ? b.is_owner : !b.is_owner,
+  );
+  const ownedCount = boards.filter((b) => b.is_owner).length;
+  const sharedCount = boards.length - ownedCount;
 
   useEffect(() => {
     apiFetch(`${API_BASE}/boards/`)
@@ -47,10 +63,11 @@ function Dashboard() {
     if (!newBoardName.trim()) return;
     try {
       const newBoard = await createBoard(newBoardName);
-      setBoards((prev) => [...prev, newBoard]);
-      setNewBoardName('');
+      setBoards((prev) => [...prev, { ...newBoard, is_owner: true }]);
+      if (view === "shared") setView("all");
+      setNewBoardName("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create board');
+      setError(err instanceof Error ? err.message : "Failed to create board");
     }
   }
 
@@ -60,22 +77,20 @@ function Dashboard() {
   }
 
   function handleDragEnd(event: DragEndEvent) {
-  const { active, over } = event;
-  if (!over || active.id === over.id) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-  const oldIndex = boards.findIndex((b) => b.id === active.id);
-  const newIndex = boards.findIndex((b) => b.id === over.id);
-  if (oldIndex === -1 || newIndex === -1) return;
+    const oldIndex = boards.findIndex((b) => b.id === active.id);
+    const newIndex = boards.findIndex((b) => b.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
 
-  const reordered = arrayMove(boards, oldIndex, newIndex);
-  setBoards(reordered);
+    const reordered = arrayMove(boards, oldIndex, newIndex);
+    setBoards(reordered);
 
-  reordered.forEach((board, index) => {
-    updateBoardPosition(board.id, index).catch(console.error);
-  });
-}
-
-  
+    reordered.forEach((board, index) => {
+      updateBoardPosition(board.id, index).catch(console.error);
+    });
+  }
 
   async function saveEdit(boardId: number) {
     const name = editBoardName.trim();
@@ -83,31 +98,34 @@ function Dashboard() {
     if (!name) return;
     try {
       await updateBoard(boardId, name);
-      setBoards((prev) => prev.map((b) => (b.id === boardId ? { ...b, name } : b)));
+      setBoards((prev) =>
+        prev.map((b) => (b.id === boardId ? { ...b, name } : b)),
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update board');
+      setError(err instanceof Error ? err.message : "Failed to update board");
     }
   }
 
   async function handleDelete(boardId: number) {
-    if (!window.confirm('Delete this board and everything in it?')) return;
+    if (!window.confirm("Delete this board and everything in it?")) return;
     try {
       await deleteBoard(boardId);
       setBoards((prev) => prev.filter((b) => b.id !== boardId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete board');
+      setError(err instanceof Error ? err.message : "Failed to delete board");
     }
   }
 
   async function handleLeave(boardId: number) {
-    if (!window.confirm('Leave this board? You will lose access to it.')) return;
+    if (!window.confirm("Leave this board? You will lose access to it."))
+      return;
     try {
-        await leaveBoard(boardId);
-        setBoards((prev) => prev.filter((b) => b.id !== boardId));
+      await leaveBoard(boardId);
+      setBoards((prev) => prev.filter((b) => b.id !== boardId));
     } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to leave board');
+      setError(err instanceof Error ? err.message : "Failed to leave board");
     }
-    }
+  }
 
   return (
     <div className="max-w-2xl">
@@ -133,29 +151,67 @@ function Dashboard() {
         </button>
       </form>
 
-      {loading && <p className="text-slate-400 text-sm">Loading your boards...</p>}
+      <div className="flex gap-2 mb-4">
+        {(
+          [
+            ["all", `All (${boards.length})`],
+            ["mine", `Created by me (${ownedCount})`],
+            ["shared", `Shared with me (${sharedCount})`],
+          ] as [View, string][]
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setView(value)}
+            className={`rounded-full px-3 py-1 text-sm transition-colors ${
+              view === value
+                ? "bg-blue-600 text-white"
+                : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-      {!loading && boards.length === 0 && (
-        <p className="text-slate-500 text-center py-16">No boards yet — create your first one above.</p>
+      {loading && (
+        <p className="text-slate-400 text-sm">Loading your boards...</p>
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={boards.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-            <div className="flex flex-col gap-2">
-            {boards.map((board) => (
-                <SortableBoardRow
-                    key={board.id}
-                    board={board}
-                    isEditing={editingBoardId === board.id}
-                    editValue={editBoardName}
-                    onStartEdit={() => startEditing(board)}
-                    onEditChange={setEditBoardName}
-                    onSaveEdit={() => saveEdit(board.id)}
-                    onDelete={() => handleDelete(board.id)}
-                    onLeave={() => handleLeave(board.id)}
-                />
+      {!loading && visibleBoards.length === 0 && (
+        <p className="text-slate-500 text-center py-16">
+          {boards.length === 0
+            ? "No boards yet — create your first one above."
+            : view === "shared"
+              ? "No boards have been shared with you yet."
+              : "You haven't created any boards yet."}
+        </p>
+      )}
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={visibleBoards.map((b) => b.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="flex flex-col gap-2">
+            {visibleBoards.map((board) => (
+              <SortableBoardRow
+                key={board.id}
+                board={board}
+                isEditing={editingBoardId === board.id}
+                editValue={editBoardName}
+                onStartEdit={() => startEditing(board)}
+                onEditChange={setEditBoardName}
+                onSaveEdit={() => saveEdit(board.id)}
+                onDelete={() => handleDelete(board.id)}
+                onLeave={() => handleLeave(board.id)}
+              />
             ))}
-            </div>
+          </div>
         </SortableContext>
       </DndContext>
     </div>
