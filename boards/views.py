@@ -71,6 +71,11 @@ class BoardViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
+    def perform_update(self, serializer):
+        if serializer.instance.owner != self.request.user:
+            raise PermissionDenied("Only the board owner can change this board.")
+        serializer.save()
+
     def perform_destroy(self, instance):
         if instance.owner != self.request.user:
             raise PermissionDenied("Only the board owner can delete this board.")
