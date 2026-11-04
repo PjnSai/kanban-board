@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { apiFetch } from "./apiFetch";
 import { createBoard, updateBoard, deleteBoard } from "./api";
 import SortableBoardRow from "./SortableBoardRow";
+import InvitesBox from "./InvitesBox";
 import {
   DndContext,
   closestCenter,
@@ -73,6 +74,15 @@ function Dashboard() {
   function startEditing(board: Board) {
     setEditingBoardId(board.id);
     setEditBoardName(board.name);
+  }
+
+  function reloadBoards() {
+    apiFetch(`${API_BASE}/boards/`)
+      .then((res) =>
+        res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)),
+      )
+      .then((data) => setBoards(data))
+      .catch((err) => setError(err.message));
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -167,7 +177,7 @@ function Dashboard() {
           {error}
         </p>
       )}
-
+      <InvitesBox onAccepted={reloadBoards} />
       <form onSubmit={handleCreateBoard} className="flex gap-2 mb-6">
         <input
           type="text"
