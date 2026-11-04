@@ -148,6 +148,7 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
     ],
     'NUM_PROXIES': 1,
     'DEFAULT_THROTTLE_RATES': {
@@ -155,7 +156,8 @@ REST_FRAMEWORK = {
         'password_reset': '5/hour',
         'account_sensitive': '5/hour',
         'login': '10/hour',
-        'register': '5/hour'
+        'register': '5/hour',
+        'user': '300/minute',
     },
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
