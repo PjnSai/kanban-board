@@ -27,7 +27,7 @@ interface Board {
   is_owner: boolean;
 }
 
-type View = "all" | "mine" | "shared";
+type View = "all" | "mine" | "shared" | "split";
 
 function Dashboard() {
   const [boards, setBoards] = useState<Board[]>([]);
@@ -41,11 +41,10 @@ function Dashboard() {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
-  const visibleBoards = boards.filter((b) =>
-    view === "all" ? true : view === "mine" ? b.is_owner : !b.is_owner,
-  );
-  const ownedCount = boards.filter((b) => b.is_owner).length;
-  const sharedCount = boards.length - ownedCount;
+  const ownedBoards = boards.filter((b) => b.is_owner);
+  const sharedBoards = boards.filter((b) => !b.is_owner);
+  const visibleBoards =
+    view === "mine" ? ownedBoards : view === "shared" ? sharedBoards : boards;
 
   useEffect(() => {
     apiFetch(`${API_BASE}/boards/`)
@@ -83,6 +82,13 @@ function Dashboard() {
     const oldIndex = boards.findIndex((b) => b.id === active.id);
     const newIndex = boards.findIndex((b) => b.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
+
+    // In side-by-side mode, only reorder within the same column
+    if (
+      view === "split" &&
+      boards[oldIndex].is_owner !== boards[newIndex].is_owner
+    )
+      return;
 
     const reordered = arrayMove(boards, oldIndex, newIndex);
     setBoards(reordered);
@@ -127,8 +133,33 @@ function Dashboard() {
     }
   }
 
+  function renderRows(list: Board[]) {
+    return (
+      <SortableContext
+        items={list.map((b) => b.id)}
+        strategy={verticalListSortingStrategy}
+      >
+        <div className="flex flex-col gap-2">
+          {list.map((board) => (
+            <SortableBoardRow
+              key={board.id}
+              board={board}
+              isEditing={editingBoardId === board.id}
+              editValue={editBoardName}
+              onStartEdit={() => startEditing(board)}
+              onEditChange={setEditBoardName}
+              onSaveEdit={() => saveEdit(board.id)}
+              onDelete={() => handleDelete(board.id)}
+              onLeave={() => handleLeave(board.id)}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    );
+  }
+
   return (
-    <div className="max-w-2xl">
+    <div className={view === "split" ? "max-w-5xl" : "max-w-2xl"}>
       {error && (
         <p className="text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
           {error}
@@ -151,12 +182,13 @@ function Dashboard() {
         </button>
       </form>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         {(
           [
             ["all", `All (${boards.length})`],
-            ["mine", `Created by me (${ownedCount})`],
-            ["shared", `Shared with me (${sharedCount})`],
+            ["mine", `Created by me (${ownedBoards.length})`],
+            ["shared", `Shared with me (${sharedBoards.length})`],
+            ["split", "Side by side"],
           ] as [View, string][]
         ).map(([value, label]) => (
           <button
@@ -178,7 +210,7 @@ function Dashboard() {
         <p className="text-slate-400 text-sm">Loading your boards...</p>
       )}
 
-      {!loading && visibleBoards.length === 0 && (
+      {!loading && view !== "split" && visibleBoards.length === 0 && (
         <p className="text-slate-500 text-center py-16">
           {boards.length === 0
             ? "No boards yet — create your first one above."
@@ -193,26 +225,36 @@ function Dashboard() {
         collisionDetection={closestCenter}
         onDragEnd={handleDragEnd}
       >
-        <SortableContext
-          items={visibleBoards.map((b) => b.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="flex flex-col gap-2">
-            {visibleBoards.map((board) => (
-              <SortableBoardRow
-                key={board.id}
-                board={board}
-                isEditing={editingBoardId === board.id}
-                editValue={editBoardName}
-                onStartEdit={() => startEditing(board)}
-                onEditChange={setEditBoardName}
-                onSaveEdit={() => saveEdit(board.id)}
-                onDelete={() => handleDelete(board.id)}
-                onLeave={() => handleLeave(board.id)}
-              />
-            ))}
+        {view === "split" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <section>
+              <h3 className="text-sm font-semibold text-slate-600 mb-2">
+                Created by me ({ownedBoards.length})
+              </h3>
+              {ownedBoards.length === 0 ? (
+                <p className="text-slate-400 text-sm">
+                  You haven't created any boards yet.
+                </p>
+              ) : (
+                renderRows(ownedBoards)
+              )}
+            </section>
+            <section>
+              <h3 className="text-sm font-semibold text-slate-600 mb-2">
+                Shared with me ({sharedBoards.length})
+              </h3>
+              {sharedBoards.length === 0 ? (
+                <p className="text-slate-400 text-sm">
+                  No boards have been shared with you yet.
+                </p>
+              ) : (
+                renderRows(sharedBoards)
+              )}
+            </section>
           </div>
-        </SortableContext>
+        ) : (
+          renderRows(visibleBoards)
+        )}
       </DndContext>
     </div>
   );
