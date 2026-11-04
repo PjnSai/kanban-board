@@ -63,24 +63,35 @@ def test_stranger_cannot_touch_board(setup):
     assert client_for(carol).patch(f'/api/boards/{board.id}/', {'name': 'X'}, format='json').status_code == 404
     assert client_for(carol).get(f'/api/boards/{board.id}/').status_code == 404
 
-
 @pytest.mark.django_db
-def test_collaborator_cannot_add_collaborators(setup):
+def test_old_add_collaborator_endpoint_is_gone(setup):
     alice, bob, carol, board = setup
-    response = client_for(bob).post(
+    response = client_for(alice).post(
         f'/api/boards/{board.id}/add-collaborator/', {'username': 'carol'}, format='json'
     )
-    assert response.status_code == 403
+    assert response.status_code == 404
     assert not board.collaborators.filter(username='carol').exists()
 
+
 @pytest.mark.django_db
-def test_membership_stays_in_sync_with_collaborators(setup):
+def test_membership_removed_when_collaborator_is_removed(setup):
     from boards.models import BoardMembership
     alice, bob, carol, board = setup
-    client = client_for(alice)
+    BoardMembership.objects.get_or_create(board=board, user=bob, defaults={'role': 'editor'})
 
-    client.post(f'/api/boards/{board.id}/add-collaborator/', {'username': 'carol'}, format='json')
-    assert BoardMembership.objects.filter(board=board, user=carol, role='editor').exists()
+    client_for(alice).post(f'/api/boards/{board.id}/remove-collaborator/', {'username': 'bob'}, format='json')
 
-    client.post(f'/api/boards/{board.id}/remove-collaborator/', {'username': 'carol'}, format='json')
-    assert not BoardMembership.objects.filter(board=board, user=carol).exists()
+    assert not board.collaborators.filter(pk=bob.pk).exists()
+    assert not BoardMembership.objects.filter(board=board, user=bob).exists()
+
+
+@pytest.mark.django_db
+def test_leaving_removes_membership(setup):
+    from boards.models import BoardMembership
+    alice, bob, carol, board = setup
+    BoardMembership.objects.get_or_create(board=board, user=bob, defaults={'role': 'editor'})
+
+    response = client_for(bob).post(f'/api/boards/{board.id}/leave/')
+
+    assert response.status_code == 200
+    assert not BoardMembership.objects.filter(board=board, user=bob).exists()
