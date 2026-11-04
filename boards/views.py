@@ -140,6 +140,17 @@ class BoardViewSet(viewsets.ModelViewSet):
         )
         return Response({'detail': f'{user.username} removed.'}, status=200)
 
+def broadcast_board_event(board_id, event, request, **fields):
+    """Send a live update to everyone watching a board. A Redis problem must never fail the request."""
+    message = {'event': event, 'origin': request.headers.get('X-Client-Id', ''), **fields}
+    try:
+        async_to_sync(get_channel_layer().group_send)(
+            f'board_{board_id}',
+            {'type': 'board_message', 'message': message},
+        )
+    except Exception:
+        logger.exception('Live update broadcast failed')
+
 
 class ListViewSet(viewsets.ModelViewSet):
     serializer_class = ListSerializer
@@ -151,62 +162,23 @@ class ListViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         list_obj = serializer.save()
-        board_id = list_obj.board.id
-        client_id = self.request.headers.get('X-Client-Id', '')
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f'board_{board_id}',
-            {
-                'type': 'board_message',
-                'message': {
-                    'event': 'list_created',
-                    'list_id': list_obj.id,
-                    'name': list_obj.name,
-                    'position': list_obj.position,
-                    'origin': client_id,
-                },
-            }
+        broadcast_board_event(
+            list_obj.board_id, 'list_created', self.request,
+            list_id=list_obj.id, name=list_obj.name, position=list_obj.position,
         )
-
-    
 
     def perform_update(self, serializer):
         list_obj = serializer.save()
-        board_id = list_obj.board.id
-        client_id = self.request.headers.get('X-Client-Id', '')
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f'board_{board_id}',
-            {
-                'type': 'board_message',
-                'message': {
-                    'event': 'list_moved',
-                    'list_id': list_obj.id,
-                    'name': list_obj.name,
-                    'position': list_obj.position,
-                    'origin': client_id,
-                },
-            }
+        broadcast_board_event(
+            list_obj.board_id, 'list_moved', self.request,
+            list_id=list_obj.id, name=list_obj.name, position=list_obj.position,
         )
 
     def perform_destroy(self, instance):
-            board_id = instance.board.id
-            list_id = instance.id
-            client_id = self.request.headers.get('X-Client-Id', '')
-            instance.delete()
-    
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                f'board_{board_id}',
-                {
-                    'type': 'board_message',
-                    'message': {
-                        'event': 'list_deleted',
-                        'list_id': list_id,
-                        'origin': client_id,
-                    },
-                }
-            )
+        board_id = instance.board_id
+        list_id = instance.id
+        instance.delete()
+        broadcast_board_event(board_id, 'list_deleted', self.request, list_id=list_id)
 
 
 class CardViewSet(viewsets.ModelViewSet):
@@ -219,62 +191,23 @@ class CardViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         card = serializer.save()
-        board_id = card.list.board.id
-        client_id = self.request.headers.get('X-Client-Id', '')
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f'board_{board_id}',
-            {
-                'type': 'board_message',
-                'message': {
-                    'event': 'card_created',
-                    'card_id': card.id,
-                    'list_id': card.list.id,
-                    'title': card.title,
-                    'position': card.position,
-                    'origin': client_id,
-                },
-            }
+        broadcast_board_event(
+            card.list.board_id, 'card_created', self.request,
+            card_id=card.id, list_id=card.list_id, title=card.title, position=card.position,
         )
 
     def perform_update(self, serializer):
         card = serializer.save()
-        board_id = card.list.board.id
-        client_id = self.request.headers.get('X-Client-Id', '')
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f'board_{board_id}',
-            {
-                'type': 'board_message',
-                'message': {
-                    'event': 'card_moved',
-                    'card_id': card.id,
-                    'list_id': card.list.id,
-                    'title': card.title,
-                    'position': card.position,
-                    'origin': client_id,
-                },
-            }
+        broadcast_board_event(
+            card.list.board_id, 'card_moved', self.request,
+            card_id=card.id, list_id=card.list_id, title=card.title, position=card.position,
         )
 
     def perform_destroy(self, instance):
-        board_id = instance.list.board.id
+        board_id = instance.list.board_id
         card_id = instance.id
-        client_id = self.request.headers.get('X-Client-Id', '')
         instance.delete()
-
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f'board_{board_id}',
-            {
-                'type': 'board_message',
-                'message': {
-                    'event': 'card_deleted',
-                    'card_id': card_id,
-                    'origin': client_id,
-                },
-            }
-        )
+        broadcast_board_event(board_id, 'card_deleted', self.request, card_id=card_id)
 
 class RegisterView(generics.CreateAPIView):
 
