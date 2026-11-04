@@ -32,8 +32,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 ASGI_APPLICATION = 'config.asgi.application'
 
 _redis_host_config = {'address': REDIS_URL}
-if REDIS_URL and REDIS_URL.startswith('rediss://'):
-    _redis_host_config['ssl_cert_reqs'] = None
 
 
 

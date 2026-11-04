@@ -108,3 +108,20 @@ def test_card_description_is_saved_and_returned(api_client, alice):
 
     assert response.status_code == 201
     assert response.data['description'] == 'Some detail'
+
+@pytest.mark.django_db
+def test_card_is_saved_even_if_live_update_fails(api_client, alice, monkeypatch):
+    from boards import views
+
+    def broken(_func):
+        raise RuntimeError('redis down')
+
+    monkeypatch.setattr(views, 'async_to_sync', broken)
+    board = Board.objects.create(name='B', owner=alice)
+    lst = List.objects.create(board=board, name='To do', position=0)
+
+    authenticate(api_client, alice)
+    response = api_client.post('/api/cards/', {'list': lst.id, 'title': 'Task', 'position': 0}, format='json')
+
+    assert response.status_code == 201
+    assert Card.objects.filter(title='Task').exists()
