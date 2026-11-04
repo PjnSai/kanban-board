@@ -313,3 +313,96 @@ export async function getWsTicket(boardId: string | number): Promise<string> {
     throw new Error(formatApiError(data, "Could not open live updates"));
   return data.ticket;
 }
+
+export interface Invitation {
+  id: number;
+  board: number;
+  board_name: string;
+  inviter: string;
+  invitee: string;
+  role: string;
+  created_at: string;
+}
+
+async function invitationRequest(
+  path: string,
+  method: string,
+  body?: unknown,
+  fallback = "Request failed",
+) {
+  const res = await apiFetch(`${API_BASE}${path}`, {
+    method,
+    headers: { "Content-Type": "application/json", "X-Client-Id": clientId },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await parseJson(res);
+  if (!res.ok) throw new Error(formatApiError(data, fallback));
+  return data;
+}
+
+export const getMyInvitations = (): Promise<Invitation[]> =>
+  invitationRequest(
+    "/invitations/",
+    "GET",
+    undefined,
+    "Could not load invitations",
+  );
+
+export const acceptInvitation = (id: number) =>
+  invitationRequest(
+    `/invitations/${id}/accept/`,
+    "POST",
+    undefined,
+    "Could not accept the invitation",
+  );
+
+export const declineInvitation = (id: number, block = false) =>
+  invitationRequest(
+    `/invitations/${id}/decline/`,
+    "POST",
+    { block },
+    "Could not decline the invitation",
+  );
+
+export const getBoardInvitations = (boardId: number): Promise<Invitation[]> =>
+  invitationRequest(
+    `/boards/${boardId}/invitations/`,
+    "GET",
+    undefined,
+    "Could not load invitations",
+  );
+
+export const sendInvitation = (
+  boardId: number,
+  username: string,
+): Promise<Invitation> =>
+  invitationRequest(
+    `/boards/${boardId}/invitations/`,
+    "POST",
+    { username },
+    "Could not send the invitation",
+  );
+
+export const cancelInvitation = (id: number) =>
+  invitationRequest(
+    `/invitations/${id}/`,
+    "DELETE",
+    undefined,
+    "Could not cancel the invitation",
+  );
+
+export const getBlocks = (): Promise<string[]> =>
+  invitationRequest(
+    "/blocks/",
+    "GET",
+    undefined,
+    "Could not load your block list",
+  );
+
+export const unblockUser = (username: string) =>
+  invitationRequest(
+    `/blocks/${encodeURIComponent(username)}/`,
+    "DELETE",
+    undefined,
+    "Could not unblock that user",
+  );

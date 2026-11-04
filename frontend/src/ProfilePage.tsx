@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { getMe, changeEmail, changePassword, type Me } from "./api";
+import {
+  getMe,
+  changeEmail,
+  changePassword,
+  getBlocks,
+  unblockUser,
+  type Me,
+} from "./api";
 import { clearTokens, deleteAccount } from "./auth";
 
 interface ProfilePageProps {
@@ -222,6 +229,65 @@ function DeleteSection({ onDeleted }: { onDeleted: () => void }) {
   );
 }
 
+function BlockedSection() {
+  const [blocked, setBlocked] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    getBlocks()
+      .then(setBlocked)
+      .catch((err) => setError(errorText(err)));
+  }, []);
+
+  async function handleUnblock(name: string) {
+    if (busy) return;
+    setBusy(name);
+    setError(null);
+    try {
+      await unblockUser(name);
+      setBlocked((prev) => prev.filter((n) => n !== name));
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="bg-white rounded-xl shadow-md p-6">
+      <h3 className="text-lg font-semibold text-slate-800 mb-2">
+        Blocked users
+      </h3>
+      <p className="text-sm text-slate-600 mb-4">
+        People you block can't invite you to their boards.
+      </p>
+      {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
+      {blocked.length === 0 ? (
+        <p className="text-sm text-slate-400">You haven't blocked anyone.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {blocked.map((name) => (
+            <li
+              key={name}
+              className="flex items-center justify-between text-sm text-slate-700"
+            >
+              <span>{name}</span>
+              <button
+                onClick={() => handleUnblock(name)}
+                disabled={busy !== null}
+                className="text-blue-600 hover:underline disabled:opacity-60"
+              >
+                {busy === name ? "Unblocking..." : "Unblock"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function ProfilePage({ onLoggedOut }: ProfilePageProps) {
   const [me, setMe] = useState<Me | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -260,6 +326,7 @@ function ProfilePage({ onLoggedOut }: ProfilePageProps) {
 
       <EmailSection onChanged={(email) => setMe({ ...me, email })} />
       <PasswordSection onChanged={onLoggedOut} />
+      <BlockedSection />
       <DeleteSection onDeleted={onLoggedOut} />
     </div>
   );
