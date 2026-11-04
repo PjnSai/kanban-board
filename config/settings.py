@@ -158,6 +158,7 @@ REST_FRAMEWORK = {
         'login': '10/hour',
         'register': '5/hour',
         'user': '300/minute',
+        'invite_send': '15/hour',
     },
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',

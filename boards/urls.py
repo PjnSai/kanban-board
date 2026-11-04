@@ -1,7 +1,10 @@
 from rest_framework.routers import DefaultRouter
 from .views import BoardViewSet, ListViewSet, CardViewSet, RegisterView, LogoutView, DeleteAccountView, PasswordResetRequestView, PasswordResetConfirmView, MeView, ChangeEmailView, ChangePasswordView, WebSocketTicketView
 from django.urls import path
- 
+from .invitation_views import (
+    BoardInvitationsView, MyInvitationsView, InvitationDetailView,
+    AcceptInvitationView, DeclineInvitationView, BlocksView, UnblockView,
+)
 
 router = DefaultRouter()
 router.register(r'boards', BoardViewSet, basename='board')
@@ -19,4 +22,11 @@ urlpatterns = router.urls + [
     path('auth/change-email/', ChangeEmailView.as_view(), name='change-email'),
     path('auth/change-password/', ChangePasswordView.as_view(), name='change-password'),
     path('boards/<int:board_id>/ws-ticket/', WebSocketTicketView.as_view(), name='ws-ticket'),
+    path('boards/<int:board_id>/invitations/', BoardInvitationsView.as_view(), name='board-invitations'),
+    path('invitations/', MyInvitationsView.as_view(), name='my-invitations'),
+    path('invitations/<int:pk>/', InvitationDetailView.as_view(), name='invitation-detail'),
+    path('invitations/<int:pk>/accept/', AcceptInvitationView.as_view(), name='invitation-accept'),
+    path('invitations/<int:pk>/decline/', DeclineInvitationView.as_view(), name='invitation-decline'),
+    path('blocks/', BlocksView.as_view(), name='blocks'),
+    path('blocks/<str:username>/', UnblockView.as_view(), name='unblock'),
 ]
