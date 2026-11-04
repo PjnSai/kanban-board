@@ -60,7 +60,10 @@ export async function createBoard(name: string) {
     },
     body: JSON.stringify({ name }),
   });
-  if (!res.ok) throw new Error(`Failed to create board: HTTP ${res.status}`);
+  if (!res.ok) {
+    const data = await parseJson(res);
+    throw new Error(formatApiError(data, "Failed to create board"));
+  }
   return res.json();
 }
 
@@ -77,7 +80,10 @@ export async function createList(
     },
     body: JSON.stringify({ board: boardId, name, position }),
   });
-  if (!res.ok) throw new Error(`Failed to create list: HTTP ${res.status}`);
+  if (!res.ok) {
+    const data = await parseJson(res);
+    throw new Error(formatApiError(data, "Failed to create list"));
+  }
   return res.json();
 }
 
@@ -94,7 +100,10 @@ export async function createCard(
     },
     body: JSON.stringify({ list: listId, title, position }),
   });
-  if (!res.ok) throw new Error(`Failed to create card: HTTP ${res.status}`);
+  if (!res.ok) {
+    const data = await parseJson(res);
+    throw new Error(formatApiError(data, "Failed to create card"));
+  }
   return res.json();
 }
 
