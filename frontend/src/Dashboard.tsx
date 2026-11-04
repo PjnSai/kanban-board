@@ -94,7 +94,9 @@ function Dashboard() {
     setBoards(reordered);
 
     reordered.forEach((board, index) => {
-      updateBoardPosition(board.id, index).catch(console.error);
+      if (board.is_owner) {
+        updateBoardPosition(board.id, index).catch(console.error);
+      }
     });
   }
 
