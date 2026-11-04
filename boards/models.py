@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.db.models import Q
 
 class Board(models.Model):
     name = models.CharField(max_length=200)
@@ -58,3 +59,31 @@ class BoardMembership(models.Model):
 
     def __str__(self):
         return f'{self.user} on {self.board} ({self.role})'
+
+class Invitation(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        ACCEPTED = 'accepted', 'Accepted'
+        DECLINED = 'declined', 'Declined'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='invitations')
+    inviter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='invitations_sent')
+    invitee = models.ForeignKey(User, on_delete=models.CASCADE, related_name='invitations_received')
+    role = models.CharField(max_length=10, choices=BoardMembership.Role.choices, default=BoardMembership.Role.EDITOR)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['board', 'invitee'],
+                condition=Q(status='pending'),
+                name='one_pending_invite_per_person_per_board',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.inviter} invited {self.invitee} to {self.board} ({self.status})'
