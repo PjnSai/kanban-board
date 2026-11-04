@@ -390,3 +390,19 @@ export const cancelInvitation = (id: number) =>
     undefined,
     "Could not cancel the invitation",
   );
+
+export const getBlocks = (): Promise<string[]> =>
+  invitationRequest(
+    "/blocks/",
+    "GET",
+    undefined,
+    "Could not load your block list",
+  );
+
+export const unblockUser = (username: string) =>
+  invitationRequest(
+    `/blocks/${encodeURIComponent(username)}/`,
+    "DELETE",
+    undefined,
+    "Could not unblock that user",
+  );
