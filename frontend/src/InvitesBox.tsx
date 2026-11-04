@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { getMyInvitations, acceptInvitation, declineInvitation } from "./api";
+import {
+  getMyInvitations,
+  acceptInvitation,
+  declineInvitation,
+  ApiError,
+} from "./api";
 import type { Invitation } from "./api";
 
 function InvitesBox({ onAccepted }: { onAccepted: () => void }) {
@@ -30,7 +35,13 @@ function InvitesBox({ onAccepted }: { onAccepted: () => void }) {
       }
       setInvites((prev) => prev.filter((i) => i.id !== id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      if (err instanceof ApiError && err.status === 404) {
+        // Cancelled or already handled: drop the stale row
+        setInvites((prev) => prev.filter((i) => i.id !== id));
+        setError("That invitation is no longer available.");
+      } else {
+        setError(err instanceof Error ? err.message : "Something went wrong");
+      }
     } finally {
       setBusyId(null);
     }

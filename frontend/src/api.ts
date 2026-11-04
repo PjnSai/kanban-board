@@ -304,6 +304,14 @@ export interface Invitation {
   created_at: string;
 }
 
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function invitationRequest(
   path: string,
   method: string,
@@ -316,7 +324,7 @@ async function invitationRequest(
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await parseJson(res);
-  if (!res.ok) throw new Error(formatApiError(data, fallback));
+  if (!res.ok) throw new ApiError(formatApiError(data, fallback), res.status);
   return data;
 }
 
