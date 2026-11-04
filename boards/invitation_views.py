@@ -1,0 +1,200 @@
+from datetime import timedelta
+
+from django.contrib.auth.models import User
+from django.db import transaction
+from django.db.models import Q
+from django.utils import timezone
+from rest_framework import permissions
+from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
+
+from .models import Board, BoardMembership, Invitation, UserBlock
+from .views import broadcast_board_event
+
+MAX_MEMBERS_PER_BOARD = 9
+MAX_PENDING_PER_BOARD = 5
+MAX_PENDING_SENT = 15
+MAX_PENDING_RECEIVED = 10
+MAX_BLOCKS = 50
+REINVITE_WAIT = timedelta(hours=24)
+
+CANT_INVITE = "This user can't be invited right now."
+PENDING = Invitation.Status.PENDING
+
+
+def _visible_board(user, board_id):
+    return Board.objects.filter(
+        Q(owner=user) | Q(collaborators=user), pk=board_id
+    ).distinct().first()
+
+
+def _invite_dict(inv):
+    return {
+        'id': inv.id,
+        'board': inv.board_id,
+        'board_name': inv.board.name,
+        'inviter': inv.inviter.username,
+        'invitee': inv.invitee.username,
+        'role': inv.role,
+        'created_at': inv.created_at,
+    }
+
+
+class BoardInvitationsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_scope = 'invite_send'
+
+    def get_throttles(self):
+        throttles = super().get_throttles()
+        if self.request.method == 'POST':
+            throttles.append(ScopedRateThrottle())
+        return throttles
+
+    def get(self, request, board_id):
+        board = _visible_board(request.user, board_id)
+        if board is None:
+            return Response({'detail': 'Not found.'}, status=404)
+        if board.owner_id != request.user.id:
+            return Response({'detail': 'Only the owner can see pending invitations.'}, status=403)
+        pending = board.invitations.filter(status=PENDING).select_related('board', 'inviter', 'invitee')
+        return Response([_invite_dict(i) for i in pending])
+
+    def post(self, request, board_id):
+        board = _visible_board(request.user, board_id)
+        if board is None:
+            return Response({'detail': 'Not found.'}, status=404)
+        if board.owner_id != request.user.id:
+            return Response({'detail': 'Only the owner can invite people.'}, status=403)
+
+        username = str(request.data.get('username', '')).strip()
+        if not username:
+            return Response({'detail': 'Enter a username.'}, status=400)
+        invitee = User.objects.filter(username=username).first()
+        if invitee is None:
+            return Response({'detail': 'No user with that username exists.'}, status=400)
+        if invitee.id == request.user.id:
+            return Response({'detail': "You can't invite yourself."}, status=400)
+
+        with transaction.atomic():
+            locked = Board.objects.select_for_update().get(pk=board.pk)
+
+            if locked.collaborators.filter(pk=invitee.pk).exists():
+                return Response({'detail': 'That user is already on this board.'}, status=400)
+            if locked.invitations.filter(invitee=invitee, status=PENDING).exists():
+                return Response({'detail': 'That user already has a pending invitation.'}, status=400)
+            if UserBlock.objects.filter(blocker=invitee, blocked=request.user).exists():
+                return Response({'detail': CANT_INVITE}, status=400)
+            cutoff = timezone.now() - REINVITE_WAIT
+            if Invitation.objects.filter(
+                board=locked, invitee=invitee,
+                status=Invitation.Status.DECLINED, responded_at__gte=cutoff,
+            ).exists():
+                return Response({'detail': CANT_INVITE}, status=400)
+
+            pending_here = locked.invitations.filter(status=PENDING).count()
+            if locked.collaborators.count() + pending_here >= MAX_MEMBERS_PER_BOARD:
+                return Response({'detail': 'This board is full.'}, status=400)
+            if pending_here >= MAX_PENDING_PER_BOARD:
+                return Response({'detail': 'Too many pending invitations on this board.'}, status=400)
+            if Invitation.objects.filter(inviter=request.user, status=PENDING).count() >= MAX_PENDING_SENT:
+                return Response({'detail': 'You have too many pending invitations. Cancel some first.'}, status=400)
+            if Invitation.objects.filter(invitee=invitee, status=PENDING).count() >= MAX_PENDING_RECEIVED:
+                return Response({'detail': CANT_INVITE}, status=400)
+
+            invitation = Invitation.objects.create(
+                board=locked, inviter=request.user, invitee=invitee,
+                role=BoardMembership.Role.EDITOR,
+            )
+        return Response(_invite_dict(invitation), status=201)
+
+
+class MyInvitationsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        pending = Invitation.objects.filter(
+            invitee=request.user, status=PENDING
+        ).select_related('board', 'inviter', 'invitee')
+        return Response([_invite_dict(i) for i in pending])
+
+
+class InvitationDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, pk):
+        invitation = Invitation.objects.select_related('board').filter(pk=pk, status=PENDING).first()
+        allowed = invitation and (
+            invitation.board.owner_id == request.user.id or invitation.inviter_id == request.user.id
+        )
+        if not allowed:
+            return Response({'detail': 'Not found.'}, status=404)
+        invitation.status = Invitation.Status.CANCELLED
+        invitation.responded_at = timezone.now()
+        invitation.save(update_fields=['status', 'responded_at'])
+        return Response({'detail': 'Invitation cancelled.'})
+
+
+class AcceptInvitationView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        with transaction.atomic():
+            invitation = Invitation.objects.select_for_update().filter(
+                pk=pk, invitee=request.user, status=PENDING
+            ).first()
+            if invitation is None:
+                return Response({'detail': 'Not found.'}, status=404)
+            board = invitation.board
+            if board.collaborators.count() >= MAX_MEMBERS_PER_BOARD:
+                return Response({'detail': 'This board is full.'}, status=400)
+
+            board.collaborators.add(request.user)
+            BoardMembership.objects.get_or_create(
+                board=board, user=request.user, defaults={'role': invitation.role}
+            )
+            invitation.status = Invitation.Status.ACCEPTED
+            invitation.responded_at = timezone.now()
+            invitation.save(update_fields=['status', 'responded_at'])
+
+        broadcast_board_event(board.id, 'collaborator_added', request, username=request.user.username)
+        return Response({'detail': 'Invitation accepted.', 'board': board.id})
+
+
+class DeclineInvitationView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        invitation = Invitation.objects.filter(pk=pk, invitee=request.user, status=PENDING).first()
+        if invitation is None:
+            return Response({'detail': 'Not found.'}, status=404)
+
+        want_block = request.data.get('block') is True
+        if want_block:
+            already = UserBlock.objects.filter(blocker=request.user, blocked_id=invitation.inviter_id).exists()
+            if not already and UserBlock.objects.filter(blocker=request.user).count() >= MAX_BLOCKS:
+                return Response({'detail': 'Your block list is full.'}, status=400)
+            UserBlock.objects.get_or_create(blocker=request.user, blocked_id=invitation.inviter_id)
+
+        invitation.status = Invitation.Status.DECLINED
+        invitation.responded_at = timezone.now()
+        invitation.save(update_fields=['status', 'responded_at'])
+        return Response({'detail': 'Invitation declined.', 'blocked': want_block})
+
+
+class BlocksView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        names = UserBlock.objects.filter(blocker=request.user).values_list('blocked__username', flat=True)
+        return Response(list(names))
+
+
+class UnblockView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, username):
+        deleted, _ = UserBlock.objects.filter(blocker=request.user, blocked__username=username).delete()
+        if not deleted:
+            return Response({'detail': 'Not found.'}, status=404)
+        return Response({'detail': 'Unblocked.'})

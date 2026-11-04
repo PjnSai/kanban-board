@@ -87,3 +87,16 @@ class Invitation(models.Model):
 
     def __str__(self):
         return f'{self.inviter} invited {self.invitee} to {self.board} ({self.status})'
+
+class UserBlock(models.Model):
+    blocker = models.ForeignKey(User, on_delete=models.CASCADE, related_name='blocks_made')
+    blocked = models.ForeignKey(User, on_delete=models.CASCADE, related_name='blocked_by')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['blocker', 'blocked'], name='unique_block'),
+        ]
+
+    def __str__(self):
+        return f'{self.blocker} blocked {self.blocked}'
