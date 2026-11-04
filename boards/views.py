@@ -37,6 +37,7 @@ from django.core.validators import validate_email as django_validate_email
 import logging
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.core import signing
+from .models import Board, List, Card, BoardMembership
 
 DAILY_EMAIL_LIMIT = 300
 
@@ -95,7 +96,8 @@ class BoardViewSet(viewsets.ModelViewSet):
         if user == board.owner:
             return Response({'detail': 'Owner is already on the board.'}, status=400)
 
-        board.collaborators.add(user)
+        board.collaborators.add(user)        
+        BoardMembership.objects.get_or_create(board=board, user=user, defaults={'role': 'editor'})
 
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
@@ -117,6 +119,7 @@ class BoardViewSet(viewsets.ModelViewSet):
         if board.owner == request.user:
             return Response({'detail': 'Owners cannot leave their own board. Delete it instead.'}, status=400)
         board.collaborators.remove(request.user)
+        BoardMembership.objects.filter(board=board, user=request.user).delete()
         return Response({'detail': 'You have left the board.'}, status=200)
 
     @action(detail=True, methods=['post'], url_path='remove-collaborator')
@@ -129,7 +132,8 @@ class BoardViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['username']
 
-        board.collaborators.remove(user)
+        board.collaborators.remove(user)        
+        BoardMembership.objects.filter(board=board, user=user).delete()
 
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
