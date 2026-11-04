@@ -38,6 +38,7 @@ import logging
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.core import signing
 from .models import Board, List, Card, BoardMembership
+from .board_permissions import EditorOrReadOnly
 
 DAILY_EMAIL_LIMIT = 300
 
@@ -133,7 +134,7 @@ def broadcast_board_event(board_id, event, request, **fields):
 
 class ListViewSet(viewsets.ModelViewSet):
     serializer_class = ListSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, EditorOrReadOnly]
 
     def get_queryset(self):
         user = self.request.user
@@ -162,7 +163,7 @@ class ListViewSet(viewsets.ModelViewSet):
 
 class CardViewSet(viewsets.ModelViewSet):
     serializer_class = CardSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, EditorOrReadOnly]
 
     def get_queryset(self):
         user = self.request.user

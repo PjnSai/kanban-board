@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import Board, List, Card
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
+from .roles import has_role
 
 
 MAX_BOARDS_PER_USER = 10
@@ -20,7 +21,7 @@ class CardSerializer(serializers.ModelSerializer):
     def validate_list(self, value):
         request = self.context['request']
         board = value.board
-        if board.owner != request.user and request.user not in board.collaborators.all():
+        if not has_role(request.user, board, 'editor'):
             raise serializers.ValidationError("You don't have permission to add cards to this list.")
         new_to_list = self.instance is None or self.instance.list_id != value.id
         if new_to_list and value.cards.count() >= MAX_CARDS_PER_LIST:
@@ -39,7 +40,7 @@ class ListSerializer(serializers.ModelSerializer):
 
     def validate_board(self, value):
         request = self.context['request']
-        if value.owner != request.user and request.user not in value.collaborators.all():
+        if not has_role(request.user, value, 'editor'):
             raise serializers.ValidationError("You don't have permission to add lists to this board.")
         new_to_board = self.instance is None or self.instance.board_id != value.id
         if new_to_board and value.lists.count() >= MAX_LISTS_PER_BOARD:
