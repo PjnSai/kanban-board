@@ -72,3 +72,15 @@ def test_collaborator_cannot_add_collaborators(setup):
     )
     assert response.status_code == 403
     assert not board.collaborators.filter(username='carol').exists()
+
+@pytest.mark.django_db
+def test_membership_stays_in_sync_with_collaborators(setup):
+    from boards.models import BoardMembership
+    alice, bob, carol, board = setup
+    client = client_for(alice)
+
+    client.post(f'/api/boards/{board.id}/add-collaborator/', {'username': 'carol'}, format='json')
+    assert BoardMembership.objects.filter(board=board, user=carol, role='editor').exists()
+
+    client.post(f'/api/boards/{board.id}/remove-collaborator/', {'username': 'carol'}, format='json')
+    assert not BoardMembership.objects.filter(board=board, user=carol).exists()
