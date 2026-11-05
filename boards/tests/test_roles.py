@@ -116,3 +116,111 @@ def test_stranger_sees_nothing(world):
     client = client_for(world['stranger'])
     assert client.get(f"/api/lists/{world['list'].id}/").status_code == 404
     assert client.get(f"/api/cards/{world['card'].id}/").status_code == 404
+
+@pytest.mark.django_db
+def test_manager_can_rename_board_but_not_reorder(world):
+    board = world['board']
+    client = client_for(world['manager'])
+    assert client.patch(f'/api/boards/{board.id}/', {'name': 'New name'}, format='json').status_code == 200
+    assert client.patch(f'/api/boards/{board.id}/', {'position': 7}, format='json').status_code == 403
+    board.refresh_from_db()
+    assert board.name == 'New name' and board.position != 7
+
+
+@pytest.mark.django_db
+def test_editors_and_viewers_cannot_rename_board(world):
+    for who in ('editor', 'viewer'):
+        response = client_for(world[who]).patch(
+            f"/api/boards/{world['board'].id}/", {'name': 'Nope'}, format='json'
+        )
+        assert response.status_code == 403
+    world['board'].refresh_from_db()
+    assert world['board'].name == 'Shared'
+
+
+@pytest.mark.django_db
+def test_only_the_owner_can_delete_the_board(world):
+    for who in ('manager', 'editor', 'viewer'):
+        assert client_for(world[who]).delete(f"/api/boards/{world['board'].id}/").status_code == 403
+    assert Board.objects.filter(pk=world['board'].pk).exists()
+    assert client_for(world['owner']).delete(f"/api/boards/{world['board'].id}/").status_code == 204
+
+
+@pytest.mark.django_db
+def test_removal_rules(world):
+    board = world['board']
+    other_manager = make_user('manager2')
+    add_member(board, other_manager, 'manager')
+    url = f'/api/boards/{board.id}/remove-collaborator/'
+
+    assert client_for(world['editor']).post(url, {'username': 'viewer'}, format='json').status_code == 403
+    assert client_for(world['viewer']).post(url, {'username': 'editor'}, format='json').status_code == 403
+
+    manager = client_for(world['manager'])
+    assert manager.post(url, {'username': 'manager2'}, format='json').status_code == 403
+    assert manager.post(url, {'username': 'owner'}, format='json').status_code == 400
+    assert board.collaborators.filter(pk=other_manager.pk).exists()
+
+    assert manager.post(url, {'username': 'editor'}, format='json').status_code == 200
+    assert manager.post(url, {'username': 'viewer'}, format='json').status_code == 200
+    assert not BoardMembership.objects.filter(board=board, user__in=[world['editor'], world['viewer']]).exists()
+
+    assert client_for(world['owner']).post(url, {'username': 'manager2'}, format='json').status_code == 200
+    assert not board.collaborators.filter(pk=other_manager.pk).exists()
+
+
+@pytest.mark.django_db
+def test_members_can_leave_but_the_owner_cannot(world):
+    board = world['board']
+    for who in ('manager', 'editor', 'viewer'):
+        response = client_for(world[who]).post(f'/api/boards/{board.id}/leave/')
+        assert response.status_code == 200
+        assert not BoardMembership.objects.filter(board=board, user=world[who]).exists()
+        assert not board.collaborators.filter(pk=world[who].pk).exists()
+    assert client_for(world['owner']).post(f'/api/boards/{board.id}/leave/').status_code == 400
+
+
+@pytest.mark.django_db
+def test_every_member_can_see_the_member_list(world):
+    board = world['board']
+    for who in ('owner', 'manager', 'editor', 'viewer'):
+        response = client_for(world[who]).get(f'/api/boards/{board.id}/members/')
+        assert response.status_code == 200
+        roles = {row['username']: row['role'] for row in response.data}
+        assert roles == {'owner': 'owner', 'manager': 'manager', 'editor': 'editor', 'viewer': 'viewer'}
+    assert client_for(world['stranger']).get(f'/api/boards/{board.id}/members/').status_code == 404
+
+
+@pytest.mark.django_db
+def test_set_role_rules(world):
+    board = world['board']
+    url = f'/api/boards/{board.id}/set-role/'
+
+    assert client_for(world['manager']).post(url, {'username': 'editor', 'role': 'viewer'}, format='json').status_code == 403
+    assert client_for(world['editor']).post(url, {'username': 'viewer', 'role': 'manager'}, format='json').status_code == 403
+
+    owner = client_for(world['owner'])
+    assert owner.post(url, {'username': 'editor', 'role': 'owner'}, format='json').status_code == 400
+    assert owner.post(url, {'username': 'stranger', 'role': 'viewer'}, format='json').status_code == 400
+    assert owner.post(url, {'username': 'viewer', 'role': 'manager'}, format='json').status_code == 200
+    assert get_role(world['viewer'], board) == 'manager'
+
+
+@pytest.mark.django_db
+def test_a_role_change_takes_effect_immediately(world):
+    board, card = world['board'], world['card']
+    client = client_for(world['editor'])
+    assert client.patch(f'/api/cards/{card.id}/', {'title': 'One'}, format='json').status_code == 200
+
+    client_for(world['owner']).post(
+        f'/api/boards/{board.id}/set-role/', {'username': 'editor', 'role': 'viewer'}, format='json'
+    )
+    assert client.patch(f'/api/cards/{card.id}/', {'title': 'Two'}, format='json').status_code == 403
+
+
+@pytest.mark.django_db
+def test_board_payload_includes_my_role(world):
+    board = world['board']
+    for who in ('owner', 'manager', 'editor', 'viewer'):
+        data = client_for(world[who]).get(f'/api/boards/{board.id}/').data
+        assert data['my_role'] == who

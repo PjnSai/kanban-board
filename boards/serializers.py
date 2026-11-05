@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import Board, List, Card
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
-from .roles import has_role
+from .roles import has_role, get_role
 
 
 MAX_BOARDS_PER_USER = 10
@@ -52,15 +52,20 @@ class BoardSerializer(serializers.ModelSerializer):
     lists = ListSerializer(many=True, read_only=True)
     collaborators = serializers.SlugRelatedField(many=True, read_only=True, slug_field='username')
     is_owner = serializers.SerializerMethodField()
+    my_role = serializers.SerializerMethodField()
 
     class Meta:
         model = Board
-        fields = ['id', 'name', 'owner', 'position', 'created_at', 'lists', 'collaborators', 'is_owner']
+        fields = ['id', 'name', 'owner', 'position', 'created_at', 'lists', 'collaborators', 'is_owner', 'my_role']
         read_only_fields = ['owner']
 
     def get_is_owner(self, obj):
         request = self.context.get('request')
         return request and obj.owner == request.user
+
+    def get_my_role(self, obj):
+        request = self.context.get('request')
+        return get_role(request.user, obj) if request else None
 
     def validate(self, attrs):
         request = self.context.get('request')

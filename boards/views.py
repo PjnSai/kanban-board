@@ -39,6 +39,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.core import signing
 from .models import Board, List, Card, BoardMembership
 from .board_permissions import EditorOrReadOnly
+from .roles import get_role
 
 DAILY_EMAIL_LIMIT = 300
 
@@ -74,15 +75,28 @@ class BoardViewSet(viewsets.ModelViewSet):
         serializer.save(owner=self.request.user)
 
     def perform_update(self, serializer):
-        if serializer.instance.owner != self.request.user:
-            raise PermissionDenied("Only the board owner can change this board.")
-        serializer.save()
+        # Owner: anything. Manager: rename only. Everyone else: nothing.
+        role = get_role(self.request.user, serializer.instance)
+        if role == 'owner' or (role == 'manager' and set(serializer.validated_data) <= {'name'}):
+            serializer.save()
+            return
+        raise PermissionDenied("You don't have permission to change this board.")
 
     def perform_destroy(self, instance):
         if instance.owner != self.request.user:
             raise PermissionDenied("Only the board owner can delete this board.")
         instance.delete()
 
+    @action(detail=True, methods=['get'], url_path='members')
+    def members(self, request, pk=None):
+        board = self.get_object()
+        roles = dict(
+            BoardMembership.objects.filter(board=board).values_list('user__username', 'role')
+        )
+        rows = [{'username': board.owner.username, 'role': 'owner'}]
+        for name in board.collaborators.order_by('username').values_list('username', flat=True):
+            rows.append({'username': name, 'role': roles.get(name, 'editor')})
+        return Response(rows)
 
     @action(detail=True, methods=['post'], url_path='leave')
     def leave(self, request, pk=None):
@@ -91,34 +105,51 @@ class BoardViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Owners cannot leave their own board. Delete it instead.'}, status=400)
         board.collaborators.remove(request.user)
         BoardMembership.objects.filter(board=board, user=request.user).delete()
+        broadcast_board_event(board.id, 'collaborator_removed', request, username=request.user.username)
         return Response({'detail': 'You have left the board.'}, status=200)
 
     @action(detail=True, methods=['post'], url_path='remove-collaborator')
     def remove_collaborator(self, request, pk=None):
         board = self.get_object()
-        if board.owner != request.user:
-            return Response({'detail': 'Only the owner can remove collaborators.'}, status=403)
+        actor_role = get_role(request.user, board)
+        if actor_role not in ('owner', 'manager'):
+            return Response({'detail': 'Only the owner or a manager can remove people.'}, status=403)
 
         serializer = CollaboratorSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['username']
 
-        board.collaborators.remove(user)        
-        BoardMembership.objects.filter(board=board, user=user).delete()
+        target_role = get_role(user, board)
+        if target_role is None:
+            return Response({'detail': 'That user is not on this board.'}, status=400)
+        if target_role == 'owner':
+            return Response({'detail': "The owner can't be removed."}, status=400)
+        if actor_role == 'manager' and target_role == 'manager':
+            return Response({'detail': 'Only the owner can remove a manager.'}, status=403)
 
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f'board_{board.id}',
-            {
-                'type': 'board_message',
-                'message': {
-                    'event': 'collaborator_removed',
-                    'username': user.username,
-                    'origin': request.headers.get('X-Client-Id', ''),
-                },
-            }
-        )
+        board.collaborators.remove(user)
+        BoardMembership.objects.filter(board=board, user=user).delete()
+        broadcast_board_event(board.id, 'collaborator_removed', request, username=user.username)
         return Response({'detail': f'{user.username} removed.'}, status=200)
+
+    @action(detail=True, methods=['post'], url_path='set-role')
+    def set_role(self, request, pk=None):
+        board = self.get_object()
+        if board.owner_id != request.user.id:
+            return Response({'detail': 'Only the owner can change roles.'}, status=403)
+        role = request.data.get('role')
+        if role not in ('viewer', 'editor', 'manager'):
+            return Response({'detail': 'Role must be viewer, editor or manager.'}, status=400)
+
+        serializer = CollaboratorSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['username']
+        if not board.collaborators.filter(pk=user.pk).exists():
+            return Response({'detail': 'That user is not a member of this board.'}, status=400)
+
+        BoardMembership.objects.update_or_create(board=board, user=user, defaults={'role': role})
+        broadcast_board_event(board.id, 'role_changed', request, username=user.username, role=role)
+        return Response({'detail': f'{user.username} is now a {role}.'})
 
 def broadcast_board_event(board_id, event, request, **fields):
     """Send a live update to everyone watching a board. A Redis problem must never fail the request."""
