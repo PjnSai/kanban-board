@@ -32,6 +32,7 @@ interface ListColumnProps {
   onSaveEditCard: (cardId: number) => void;
   onDeleteList: () => void;
   onDeleteCard: (cardId: number) => void;
+  canEdit: boolean;
 }
 
 function ListColumn({
@@ -53,6 +54,7 @@ function ListColumn({
   onSaveEditCard,
   onDeleteList,
   onDeleteCard,
+  canEdit,
 }: ListColumnProps) {
   const { setNodeRef: setDroppableRef } = useDroppable({ id: `list-${id}` });
   const {
@@ -78,14 +80,16 @@ function ListColumn({
     >
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-1 flex-1 min-w-0">
-          <span
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 px-1 touch-none"
-          >
-            ⠿
-          </span>
-          {isEditing ? (
+          {canEdit && (
+            <span
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 px-1 touch-none"
+            >
+              ⠿
+            </span>
+          )}
+          {isEditing && canEdit ? (
             <input
               type="text"
               value={editValue}
@@ -97,20 +101,24 @@ function ListColumn({
             />
           ) : (
             <h3
-              onClick={onStartEdit}
-              className="text-sm font-semibold text-slate-600 uppercase tracking-wide cursor-pointer hover:text-blue-600 truncate"
+              onClick={canEdit ? onStartEdit : undefined}
+              className={`text-sm font-semibold text-slate-600 uppercase tracking-wide truncate ${
+                canEdit ? "cursor-pointer hover:text-blue-600" : ""
+              }`}
             >
               {name}
             </h3>
           )}
         </div>
-        <button
-          onClick={onDeleteList}
-          className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-200 text-slate-400 hover:bg-red-100 hover:text-red-600 text-xs shrink-0"
-          title="Delete list"
-        >
-          ✕
-        </button>
+        {canEdit && (
+          <button
+            onClick={onDeleteList}
+            className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-200 text-slate-400 hover:bg-red-100 hover:text-red-600 text-xs shrink-0"
+            title="Delete list"
+          >
+            ✕
+          </button>
+        )}
       </div>
       <div ref={setDroppableRef} className="flex flex-col gap-2 min-h-10">
         <SortableContext
@@ -128,25 +136,28 @@ function ListColumn({
               onEditChange={onEditCardChange}
               onSaveEdit={() => onSaveEditCard(card.id)}
               onDelete={() => onDeleteCard(card.id)}
+              canEdit={canEdit}
             />
           ))}
         </SortableContext>
       </div>
-      <form onSubmit={onCreateCard} className="mt-2 flex gap-1">
-        <input
-          type="text"
-          placeholder="Add a card"
-          value={newCardValue}
-          onChange={(e) => onNewCardChange(e.target.value)}
-          className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button
-          type="submit"
-          className="bg-slate-200 text-slate-600 rounded-lg px-2.5 text-sm hover:bg-slate-300 transition-colors"
-        >
-          +
-        </button>
-      </form>
+      {canEdit && (
+        <form onSubmit={onCreateCard} className="mt-2 flex gap-1">
+          <input
+            type="text"
+            placeholder="Add a card"
+            value={newCardValue}
+            onChange={(e) => onNewCardChange(e.target.value)}
+            className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="submit"
+            className="bg-slate-200 text-slate-600 rounded-lg px-2.5 text-sm hover:bg-slate-300 transition-colors"
+          >
+            +
+          </button>
+        </form>
+      )}
     </div>
   );
 }

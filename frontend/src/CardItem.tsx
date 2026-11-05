@@ -10,6 +10,7 @@ interface CardItemProps {
   onEditChange: (value: string) => void;
   onSaveEdit: () => void;
   onDelete: () => void;
+  canEdit: boolean;
 }
 
 function CardItem({
@@ -21,6 +22,7 @@ function CardItem({
   onEditChange,
   onSaveEdit,
   onDelete,
+  canEdit,
 }: CardItemProps) {
   const {
     attributes,
@@ -37,7 +39,7 @@ function CardItem({
     opacity: isDragging ? 0.4 : 1,
   };
 
-  if (isEditing) {
+  if (isEditing && canEdit) {
     return (
       <div
         ref={setNodeRef}
@@ -61,23 +63,29 @@ function CardItem({
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      onClick={onStartEdit}
-      className="group relative bg-white rounded-lg px-3 py-2 pr-7 shadow-sm border border-slate-200 text-sm text-slate-700 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow touch-none"
+      {...(canEdit ? attributes : {})}
+      {...(canEdit ? listeners : {})}
+      onClick={canEdit ? onStartEdit : undefined}
+      className={`group relative bg-white rounded-lg px-3 py-2 shadow-sm border border-slate-200 text-sm text-slate-700 ${
+        canEdit
+          ? "pr-7 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow touch-none"
+          : ""
+      }`}
     >
       {title}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        onPointerDown={(e) => e.stopPropagation()}
-        className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-600 opacity-70 group-hover:opacity-100 transition-opacity text-xs"
-        title="Delete card"
-      >
-        ✕
-      </button>
+      {canEdit && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-600 opacity-70 group-hover:opacity-100 transition-opacity text-xs"
+          title="Delete card"
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   cancelInvitation,
 } from "./api";
 import type { Member, Invitation } from "./api";
+import { useConfirm } from "./confirmContext";
 
 interface MembersPanelProps {
   boardId: number;
@@ -17,6 +18,8 @@ interface MembersPanelProps {
   memberCount: number;
   onRemoved: (username: string) => void;
 }
+
+
 
 const LABELS: Record<string, string> = {
   owner: "Owner",
@@ -35,6 +38,7 @@ function MembersPanel({
   memberCount,
   onRemoved,
 }: MembersPanelProps) {
+  const confirm = useConfirm();   
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
@@ -99,8 +103,15 @@ function MembersPanel({
     });
   }
 
-  function handleRemove(name: string) {
-    if (!window.confirm(`Remove ${name} from this board?`)) return;
+  async function handleRemove(name: string) {
+    const ok = await confirm({
+      title: `Remove ${name}?`,
+      message:
+        "They will lose access to this board straight away. You can invite them again later.",
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
     run(async () => {
       await removeMember(boardId, name);
       onRemoved(name);
@@ -118,9 +129,14 @@ function MembersPanel({
     run(() => cancelInvitation(id));
   }
 
-  function handleLeave() {
-    if (!window.confirm("Leave this board? You will lose access to it."))
-      return;
+  async function handleLeave() {
+    const ok = await confirm({
+      title: "Leave this board?",
+      message: "You will lose access unless someone invites you again.",
+      confirmLabel: "Leave board",
+      danger: true,
+    });
+    if (!ok) return;
     run(async () => {
       await leaveBoard(boardId);
       navigate("/");
