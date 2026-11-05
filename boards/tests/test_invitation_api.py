@@ -180,3 +180,94 @@ def test_invites_are_throttled(people):
     for _ in range(limit):
         assert invite(client, board, 'nobody').status_code == 400
     assert invite(client, board, 'nobody').status_code == 429
+
+@pytest.mark.django_db
+def test_manager_invites_as_editor_or_viewer_only(people):
+    alice, bob, carol = people
+    board = Board.objects.create(name='B', owner=alice)
+    manager = make_user('manager')
+    board.collaborators.add(manager)
+    BoardMembership.objects.create(board=board, user=manager, role='manager')
+    client = client_for(manager)
+
+    as_manager = client.post(f'/api/boards/{board.id}/invitations/', {'username': 'bob', 'role': 'manager'}, format='json')
+    assert as_manager.status_code == 403
+    assert client.post(f'/api/boards/{board.id}/invitations/', {'username': 'bob', 'role': 'viewer'}, format='json').status_code == 201
+    assert client.post(f'/api/boards/{board.id}/invitations/', {'username': 'carol'}, format='json').data['role'] == 'editor'
+
+
+@pytest.mark.django_db
+def test_owner_can_invite_as_manager_and_accepting_keeps_the_role(people):
+    alice, bob, carol = people
+    board = Board.objects.create(name='B', owner=alice)
+    response = client_for(alice).post(
+        f'/api/boards/{board.id}/invitations/', {'username': 'bob', 'role': 'manager'}, format='json'
+    )
+    assert response.status_code == 201
+    client_for(bob).post(f"/api/invitations/{response.data['id']}/accept/")
+    assert BoardMembership.objects.get(board=board, user=bob).role == 'manager'
+
+
+@pytest.mark.django_db
+def test_editors_and_viewers_cannot_invite_or_list_invitations(people):
+    alice, bob, carol = people
+    board = Board.objects.create(name='B', owner=alice)
+    for name, role in (('editor1', 'editor'), ('viewer1', 'viewer')):
+        member = make_user(name)
+        board.collaborators.add(member)
+        BoardMembership.objects.create(board=board, user=member, role=role)
+        client = client_for(member)
+        assert client.post(f'/api/boards/{board.id}/invitations/', {'username': 'bob'}, format='json').status_code == 403
+        assert client.get(f'/api/boards/{board.id}/invitations/').status_code == 403
+
+
+@pytest.mark.django_db
+def test_manager_allowance_and_visibility(people, monkeypatch):
+    alice, bob, carol = people
+    board = Board.objects.create(name='B', owner=alice)
+    manager = make_user('manager')
+    board.collaborators.add(manager)
+    BoardMembership.objects.create(board=board, user=manager, role='manager')
+    monkeypatch.setattr(iv, 'MAX_PENDING_PER_MANAGER', 1)
+
+    client = client_for(manager)
+    assert client.post(f'/api/boards/{board.id}/invitations/', {'username': 'bob'}, format='json').status_code == 201
+    assert client.post(f'/api/boards/{board.id}/invitations/', {'username': 'carol'}, format='json').status_code == 400
+
+    # the owner can still invite, and sees both; the manager sees only their own
+    assert invite(client_for(alice), board, 'carol').status_code == 201
+    assert len(client_for(alice).get(f'/api/boards/{board.id}/invitations/').data) == 2
+    assert len(client.get(f'/api/boards/{board.id}/invitations/').data) == 1
+
+
+@pytest.mark.django_db
+def test_who_can_cancel_an_invite(people):
+    alice, bob, carol = people
+    board = Board.objects.create(name='B', owner=alice)
+    manager = make_user('manager')
+    other_manager = make_user('manager2')
+    for user in (manager, other_manager):
+        board.collaborators.add(user)
+        BoardMembership.objects.create(board=board, user=user, role='manager')
+
+    sent = client_for(manager).post(f'/api/boards/{board.id}/invitations/', {'username': 'bob'}, format='json').data['id']
+
+    assert client_for(other_manager).delete(f'/api/invitations/{sent}/').status_code == 404
+    assert client_for(bob).delete(f'/api/invitations/{sent}/').status_code == 404
+    assert client_for(manager).delete(f'/api/invitations/{sent}/').status_code == 200
+
+    again = client_for(alice).post(f'/api/boards/{board.id}/invitations/', {'username': 'bob'}, format='json').data['id']
+    assert client_for(alice).delete(f'/api/invitations/{again}/').status_code == 200
+
+
+@pytest.mark.django_db
+def test_a_demoted_manager_cannot_cancel(people):
+    alice, bob, carol = people
+    board = Board.objects.create(name='B', owner=alice)
+    manager = make_user('manager')
+    board.collaborators.add(manager)
+    BoardMembership.objects.create(board=board, user=manager, role='manager')
+    sent = client_for(manager).post(f'/api/boards/{board.id}/invitations/', {'username': 'bob'}, format='json').data['id']
+
+    BoardMembership.objects.filter(board=board, user=manager).update(role='viewer')
+    assert client_for(manager).delete(f'/api/invitations/{sent}/').status_code == 404
