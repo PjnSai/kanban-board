@@ -38,6 +38,8 @@ function BoardView() {
     error,
     notice,
     setNotice,
+    removed,
+    membersVersion,
     newListName,
     setNewListName,
     newCardTitle,
@@ -192,6 +194,13 @@ function BoardView() {
       });
     }
   }
+  if (removed)
+    return (
+      <PageMessage
+        title="You no longer have access to this board"
+        message="The owner or a manager removed you from this board. If you think this is a mistake, ask them to invite you again."
+      />
+    );
 
   if (loading)
     return <p className="text-slate-400 text-sm">Loading board...</p>;
@@ -225,6 +234,7 @@ function BoardView() {
         boardId={board.id}
         myRole={board.my_role}
         memberCount={board.collaborators.length}
+        refreshKey={membersVersion}
         onRemoved={(username) =>
           setBoard({
             ...board,

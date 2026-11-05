@@ -49,6 +49,8 @@ export function useBoard(boardId: number) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [removed, setRemoved] = useState(false);
+  const [membersVersion, setMembersVersion] = useState(0);
 
   const [newListName, setNewListName] = useState("");
   const [newCardTitle, setNewCardTitle] = useState<{
@@ -75,6 +77,21 @@ export function useBoard(boardId: number) {
     if (!boardId) return;
     let ws: WebSocket | undefined;
     let cancelled = false;
+
+    const reloadBoard = async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/boards/${boardId}/`);
+        if (res.status === 403 || res.status === 404) {
+          ws?.close();
+          setRemoved(true);
+          return;
+        }
+        if (!res.ok) return;
+        setBoard(await res.json());
+      } catch {
+        // keep what is on screen
+      }
+    };
 
     const handleMessage = (event: MessageEvent) => {
       const data = JSON.parse(event.data);
@@ -195,8 +212,14 @@ export function useBoard(boardId: number) {
           };
         });
       }
+      if (
+        data.event === "role_changed" ||
+        data.event === "collaborator_removed"
+      ) {
+        setMembersVersion((v) => v + 1);
+        reloadBoard();
+      }
     };
-
     getWsTicket(boardId)
       .then((ticket) => {
         if (cancelled) return;
@@ -337,6 +360,8 @@ export function useBoard(boardId: number) {
     setError,
     notice,
     setNotice,
+    removed,
+    membersVersion,
     newListName,
     setNewListName,
     newCardTitle,

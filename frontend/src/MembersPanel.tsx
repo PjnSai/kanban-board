@@ -17,9 +17,8 @@ interface MembersPanelProps {
   myRole: string | null;
   memberCount: number;
   onRemoved: (username: string) => void;
+  refreshKey: number;
 }
-
-
 
 const LABELS: Record<string, string> = {
   owner: "Owner",
@@ -37,8 +36,9 @@ function MembersPanel({
   myRole,
   memberCount,
   onRemoved,
+  refreshKey,
 }: MembersPanelProps) {
-  const confirm = useConfirm();   
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
@@ -66,7 +66,7 @@ function MembersPanel({
         .then(setPending)
         .catch(() => {});
     }
-  }, [open, boardId, canInvite, memberCount, version]);
+  }, [open, boardId, canInvite, memberCount, version, refreshKey]);
 
   async function run(action: () => Promise<unknown>) {
     if (busy) return;
