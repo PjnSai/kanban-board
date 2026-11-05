@@ -363,11 +363,12 @@ export const getBoardInvitations = (boardId: number): Promise<Invitation[]> =>
 export const sendInvitation = (
   boardId: number,
   username: string,
+  role = "editor",
 ): Promise<Invitation> =>
   invitationRequest(
     `/boards/${boardId}/invitations/`,
     "POST",
-    { username },
+    { username, role },
     "Could not send the invitation",
   );
 
@@ -393,4 +394,37 @@ export const unblockUser = (username: string) =>
     "DELETE",
     undefined,
     "Could not unblock that user",
+  );
+
+export interface Member {
+  username: string;
+  role: "owner" | "manager" | "editor" | "viewer";
+}
+
+export const getMembers = (boardId: number): Promise<Member[]> =>
+  invitationRequest(
+    `/boards/${boardId}/members/`,
+    "GET",
+    undefined,
+    "Could not load members",
+  );
+
+export const setMemberRole = (
+  boardId: number,
+  username: string,
+  role: string,
+) =>
+  invitationRequest(
+    `/boards/${boardId}/set-role/`,
+    "POST",
+    { username, role },
+    "Could not change the role",
+  );
+
+export const removeMember = (boardId: number, username: string) =>
+  invitationRequest(
+    `/boards/${boardId}/remove-collaborator/`,
+    "POST",
+    { username },
+    "Could not remove that person",
   );
