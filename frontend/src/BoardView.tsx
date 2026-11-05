@@ -11,7 +11,7 @@ import {
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import ListColumn from "./ListColumn";
-import CollaboratorsPanel from "./CollaboratorsPanel";
+import MembersPanel from "./MembersPanel";
 import { useBoard } from "./useBoard";
 import {
   SortableContext,
@@ -190,16 +190,10 @@ function BoardView() {
   return (
     <div>
       <h2 className="text-lg font-medium text-slate-700 mb-2">{board.name}</h2>
-      <CollaboratorsPanel
+      <MembersPanel
         boardId={board.id}
-        collaborators={board.collaborators}
-        isOwner={board.is_owner}
-        onAdded={(username) =>
-          setBoard({
-            ...board,
-            collaborators: [...board.collaborators, username],
-          })
-        }
+        myRole={board.my_role}
+        memberCount={board.collaborators.length}
         onRemoved={(username) =>
           setBoard({
             ...board,
