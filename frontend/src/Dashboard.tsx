@@ -18,6 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { updateBoardPosition } from "./api";
 import { leaveBoard } from "./api";
+import { useConfirm } from "./confirmContext";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -31,6 +32,7 @@ interface Board {
 type View = "all" | "mine" | "shared" | "split";
 
 function Dashboard() {
+  const confirm = useConfirm();
   const [boards, setBoards] = useState<Board[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +127,14 @@ function Dashboard() {
   }
 
   async function handleDelete(boardId: number) {
-    if (!window.confirm("Delete this board and everything in it?")) return;
+    const target = boards.find((b) => b.id === boardId);
+    const ok = await confirm({
+      title: "Delete this board?",
+      message: `"${target?.name ?? "This board"}" and everything in it will be permanently deleted. This can't be undone.`,
+      confirmLabel: "Delete board",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await deleteBoard(boardId);
       setBoards((prev) => prev.filter((b) => b.id !== boardId));
@@ -135,8 +144,14 @@ function Dashboard() {
   }
 
   async function handleLeave(boardId: number) {
-    if (!window.confirm("Leave this board? You will lose access to it."))
-      return;
+    const target = boards.find((b) => b.id === boardId);
+    const ok = await confirm({
+      title: "Leave this board?",
+      message: `You will lose access to "${target?.name ?? "this board"}" unless someone invites you again.`,
+      confirmLabel: "Leave board",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await leaveBoard(boardId);
       setBoards((prev) => prev.filter((b) => b.id !== boardId));

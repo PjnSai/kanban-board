@@ -10,6 +10,7 @@ import {
   clientId,
   getWsTicket,
 } from "./api";
+import { useConfirm } from "./confirmContext";
 
 interface Card {
   id: number;
@@ -35,9 +36,11 @@ const API_BASE = import.meta.env.VITE_API_BASE;
 const WS_BASE = import.meta.env.VITE_WS_BASE;
 
 export function useBoard(boardId: number) {
+  const confirm = useConfirm(); 
   const [board, setBoard] = useState<Board | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [newListName, setNewListName] = useState("");
   const [newCardTitle, setNewCardTitle] = useState<{
@@ -217,7 +220,7 @@ export function useBoard(boardId: number) {
       });
       setNewListName("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create list");
+      setNotice(err instanceof Error ? err.message : "Failed to create list");
     }
   }
 
@@ -237,7 +240,7 @@ export function useBoard(boardId: number) {
       });
       setNewCardTitle((prev) => ({ ...prev, [listId]: "" }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create card");
+      setNotice(err instanceof Error ? err.message : "Failed to create card");
     }
   }
 
@@ -257,7 +260,7 @@ export function useBoard(boardId: number) {
         lists: board.lists.map((l) => (l.id === listId ? { ...l, name } : l)),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update list");
+      setNotice(err instanceof Error ? err.message : "Failed to update list");
     }
   }
 
@@ -280,17 +283,25 @@ export function useBoard(boardId: number) {
         })),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update card");
+      setNotice(err instanceof Error ? err.message : "Failed to update card");
     }
   }
 
   async function handleDeleteList(listId: number) {
-    if (!window.confirm("Delete this list and its cards?") || !board) return;
+    if (!board) return;
+    const target = board.lists.find((l) => l.id === listId);
+    const ok = await confirm({
+      title: "Delete this list?",
+      message: `"${target?.name ?? "This list"}" and all of its cards will be permanently deleted.`,
+      confirmLabel: "Delete list",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await deleteList(listId);
       setBoard({ ...board, lists: board.lists.filter((l) => l.id !== listId) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete list");
+      setNotice(err instanceof Error ? err.message : "Failed to delete list");
     }
   }
 
@@ -306,7 +317,7 @@ export function useBoard(boardId: number) {
         })),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete card");
+      setNotice(err instanceof Error ? err.message : "Failed to delete card");
     }
   }
 
@@ -316,6 +327,8 @@ export function useBoard(boardId: number) {
     loading,
     error,
     setError,
+    notice,
+    setNotice,
     newListName,
     setNewListName,
     newCardTitle,

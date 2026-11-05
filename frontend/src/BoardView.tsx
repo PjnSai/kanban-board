@@ -19,6 +19,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { updateCard, updateListPosition } from "./api";
+import PageMessage from "./PageMessage";
 
 interface Card {
   id: number;
@@ -35,6 +36,8 @@ function BoardView() {
     setBoard,
     loading,
     error,
+    notice,
+    setNotice,
     newListName,
     setNewListName,
     newCardTitle,
@@ -56,6 +59,10 @@ function BoardView() {
   } = useBoard(boardId);
 
   const [activeCard, setActiveCard] = useState<Card | null>(null);
+  const canEdit =
+    board?.my_role === "owner" ||
+    board?.my_role === "manager" ||
+    board?.my_role === "editor";
 
   const [activeColumn, setActiveColumn] = useState<{
     id: number;
@@ -70,6 +77,7 @@ function BoardView() {
   );
 
   function handleDragStart(event: DragStartEvent) {
+    if (!canEdit) return;
     const activeId = event.active.id;
 
     if (typeof activeId === "string" && activeId.startsWith("col-")) {
@@ -90,6 +98,7 @@ function BoardView() {
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    if (!canEdit) return;
     setActiveCard(null);
     setActiveColumn(null);
     const { active, over } = event;
@@ -184,12 +193,31 @@ function BoardView() {
 
   if (loading)
     return <p className="text-slate-400 text-sm">Loading board...</p>;
-  if (error) return <p className="text-red-600">{error}</p>;
+  if (error)
+    return (
+      <PageMessage
+        title="Board not available"
+        message="We couldn't open this board. It may have been deleted, you may no longer have access, or the server may be waking up."
+      />
+    );
   if (!board) return null;
 
   return (
     <div>
       <h2 className="text-lg font-medium text-slate-700 mb-2">{board.name}</h2>
+      {!canEdit && (
+        <p className="text-sm text-slate-500 mb-2">
+          You have view-only access to this board.
+        </p>
+      )}
+      {notice && (
+        <p className="text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm mb-3">
+          {notice}{" "}
+          <button className="underline" onClick={() => setNotice(null)}>
+            Dismiss
+          </button>
+        </p>
+      )}
       <MembersPanel
         boardId={board.id}
         myRole={board.my_role}
@@ -256,21 +284,23 @@ function BoardView() {
           </DragOverlay>
         </DndContext>
       </div>
-      <form onSubmit={handleCreateList} className="flex gap-2 mt-4">
-        <input
-          type="text"
-          placeholder="New list name"
-          value={newListName}
-          onChange={(e) => setNewListName(e.target.value)}
-          className="border border-slate-300 rounded-lg px-3 py-2 text-sm max-w-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button
-          type="submit"
-          className="bg-slate-200 text-slate-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-300 transition-colors"
-        >
-          Add List
-        </button>
-      </form>
+      {canEdit && (
+        <form onSubmit={handleCreateList} className="flex gap-2 mt-4">
+          <input
+            type="text"
+            placeholder="New list name"
+            value={newListName}
+            onChange={(e) => setNewListName(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm max-w-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="submit"
+            className="bg-slate-200 text-slate-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-300 transition-colors"
+          >
+            Add List
+          </button>
+        </form>
+      )}
     </div>
   );
 }
