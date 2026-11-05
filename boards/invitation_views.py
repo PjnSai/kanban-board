@@ -8,15 +8,16 @@ from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
-
 from .models import Board, BoardMembership, Invitation, UserBlock
 from .views import broadcast_board_event
+from .roles import get_role
 
 MAX_MEMBERS_PER_BOARD = 9
 MAX_PENDING_PER_BOARD = 5
 MAX_PENDING_SENT = 15
 MAX_PENDING_RECEIVED = 10
 MAX_BLOCKS = 50
+MAX_PENDING_PER_MANAGER = 3
 REINVITE_WAIT = timedelta(hours=24)
 
 CANT_INVITE = "This user can't be invited right now."
@@ -27,6 +28,10 @@ def _visible_board(user, board_id):
     return Board.objects.filter(
         Q(owner=user) | Q(collaborators=user), pk=board_id
     ).distinct().first()
+
+
+def _can_invite(role):
+    return role in ('owner', 'manager')
 
 
 def _invite_dict(inv):
@@ -46,26 +51,35 @@ class BoardInvitationsView(APIView):
     throttle_scope = 'invite_send'
 
     def get_throttles(self):
-        throttles = super().get_throttles()
+        # Only sending invites is limited; viewing the pending list is not
         if self.request.method == 'POST':
-            throttles.append(ScopedRateThrottle())
-        return throttles
+            return [ScopedRateThrottle()]
+        return []
 
     def get(self, request, board_id):
         board = _visible_board(request.user, board_id)
         if board is None:
             return Response({'detail': 'Not found.'}, status=404)
-        if board.owner_id != request.user.id:
-            return Response({'detail': 'Only the owner can see pending invitations.'}, status=403)
+        role = get_role(request.user, board)
+        if not _can_invite(role):
+            return Response({'detail': 'Only the owner or a manager can see pending invitations.'}, status=403)
         pending = board.invitations.filter(status=PENDING).select_related('board', 'inviter', 'invitee')
+        if role == 'manager':
+            pending = pending.filter(inviter=request.user)
         return Response([_invite_dict(i) for i in pending])
 
     def post(self, request, board_id):
         board = _visible_board(request.user, board_id)
         if board is None:
             return Response({'detail': 'Not found.'}, status=404)
-        if board.owner_id != request.user.id:
-            return Response({'detail': 'Only the owner can invite people.'}, status=403)
+        actor_role = get_role(request.user, board)
+        if not _can_invite(actor_role):
+            return Response({'detail': 'Only the owner or a manager can invite people.'}, status=403)
+
+        role = request.data.get('role', BoardMembership.Role.EDITOR)
+        allowed_roles = ('viewer', 'editor', 'manager') if actor_role == 'owner' else ('viewer', 'editor')
+        if role not in allowed_roles:
+            return Response({'detail': "You can't invite someone with that role."}, status=403)
 
         username = str(request.data.get('username', '')).strip()
         if not username:
@@ -79,7 +93,7 @@ class BoardInvitationsView(APIView):
         with transaction.atomic():
             locked = Board.objects.select_for_update().get(pk=board.pk)
 
-            if locked.collaborators.filter(pk=invitee.pk).exists():
+            if invitee.id == locked.owner_id or locked.collaborators.filter(pk=invitee.pk).exists():
                 return Response({'detail': 'That user is already on this board.'}, status=400)
             if locked.invitations.filter(invitee=invitee, status=PENDING).exists():
                 return Response({'detail': 'That user already has a pending invitation.'}, status=400)
@@ -99,12 +113,16 @@ class BoardInvitationsView(APIView):
                 return Response({'detail': 'Too many pending invitations on this board.'}, status=400)
             if Invitation.objects.filter(inviter=request.user, status=PENDING).count() >= MAX_PENDING_SENT:
                 return Response({'detail': 'You have too many pending invitations. Cancel some first.'}, status=400)
+            if (
+                actor_role == 'manager'
+                and locked.invitations.filter(inviter=request.user, status=PENDING).count() >= MAX_PENDING_PER_MANAGER
+            ):
+                return Response({'detail': 'You have too many pending invitations on this board.'}, status=400)
             if Invitation.objects.filter(invitee=invitee, status=PENDING).count() >= MAX_PENDING_RECEIVED:
                 return Response({'detail': CANT_INVITE}, status=400)
 
             invitation = Invitation.objects.create(
-                board=locked, inviter=request.user, invitee=invitee,
-                role=BoardMembership.Role.EDITOR,
+                board=locked, inviter=request.user, invitee=invitee, role=role,
             )
         return Response(_invite_dict(invitation), status=201)
 
@@ -124,9 +142,12 @@ class InvitationDetailView(APIView):
 
     def delete(self, request, pk):
         invitation = Invitation.objects.select_related('board').filter(pk=pk, status=PENDING).first()
-        allowed = invitation and (
-            invitation.board.owner_id == request.user.id or invitation.inviter_id == request.user.id
-        )
+        allowed = False
+        if invitation:
+            board_role = get_role(request.user, invitation.board)
+            allowed = board_role == 'owner' or (
+                invitation.inviter_id == request.user.id and board_role == 'manager'
+            )
         if not allowed:
             return Response({'detail': 'Not found.'}, status=404)
         invitation.status = Invitation.Status.CANCELLED
