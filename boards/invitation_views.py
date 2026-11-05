@@ -51,10 +51,11 @@ class BoardInvitationsView(APIView):
     throttle_scope = 'invite_send'
 
     def get_throttles(self):
-        # Only sending invites is limited; viewing the pending list is not
+        throttles = super().get_throttles()
+        # Sending an invite also counts against the 15-an-hour limit
         if self.request.method == 'POST':
-            return [ScopedRateThrottle()]
-        return []
+            throttles.append(ScopedRateThrottle())
+        return throttles
 
     def get(self, request, board_id):
         board = _visible_board(request.user, board_id)
