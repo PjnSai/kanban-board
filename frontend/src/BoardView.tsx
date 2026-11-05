@@ -76,6 +76,8 @@ function BoardView() {
     }),
   );
 
+  const noSensors = useSensors();
+
   function handleDragStart(event: DragStartEvent) {
     if (!canEdit) return;
     const activeId = event.active.id;
@@ -206,12 +208,13 @@ function BoardView() {
     <div>
       <h2 className="text-lg font-medium text-slate-700 mb-2">{board.name}</h2>
       {!canEdit && (
-        <p className="text-sm text-slate-500 mb-2">
-          You have view-only access to this board.
+        <p className="text-sm text-slate-600 bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 mb-3">
+          You're a viewer on this board, so you can read it but not change it.
+          To make changes, ask the owner or a manager to give you editor access.
         </p>
       )}
       {notice && (
-        <p className="text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm mb-3">
+        <p className="text-slate-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm mb-3">
           {notice}{" "}
           <button className="underline" onClick={() => setNotice(null)}>
             Dismiss
@@ -231,7 +234,7 @@ function BoardView() {
       />
       <div className="flex items-start gap-4 overflow-x-auto pb-2 snap-x snap-mandatory">
         <DndContext
-          sensors={sensors}
+          sensors={canEdit ? sensors : noSensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
@@ -267,6 +270,7 @@ function BoardView() {
                 onSaveEditCard={saveEditCard}
                 onDeleteList={() => handleDeleteList(list.id)}
                 onDeleteCard={handleDeleteCard}
+                canEdit={canEdit}
               />
             ))}
           </SortableContext>

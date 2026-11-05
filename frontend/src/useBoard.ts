@@ -35,8 +35,16 @@ interface Board {
 const API_BASE = import.meta.env.VITE_API_BASE;
 const WS_BASE = import.meta.env.VITE_WS_BASE;
 
+function friendly(err: unknown, fallback: string) {
+  const text = err instanceof Error ? err.message : "";
+  if (text.includes("403") || text.toLowerCase().includes("permission")) {
+    return "You don't have editor access on this board. Ask the owner or a manager if you need to make changes.";
+  }
+  return text || fallback;
+}
+
 export function useBoard(boardId: number) {
-  const confirm = useConfirm(); 
+  const confirm = useConfirm();
   const [board, setBoard] = useState<Board | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -220,7 +228,7 @@ export function useBoard(boardId: number) {
       });
       setNewListName("");
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Failed to create list");
+      setNotice(friendly(err, "Failed to create list"));
     }
   }
 
@@ -240,7 +248,7 @@ export function useBoard(boardId: number) {
       });
       setNewCardTitle((prev) => ({ ...prev, [listId]: "" }));
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Failed to create card");
+      setNotice(friendly(err, "Failed to create card"));
     }
   }
 
@@ -260,7 +268,7 @@ export function useBoard(boardId: number) {
         lists: board.lists.map((l) => (l.id === listId ? { ...l, name } : l)),
       });
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Failed to update list");
+      setNotice(friendly(err, "Failed to update list"));
     }
   }
 
@@ -283,7 +291,7 @@ export function useBoard(boardId: number) {
         })),
       });
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Failed to update card");
+      setNotice(friendly(err, "Failed to update card"));
     }
   }
 
@@ -301,7 +309,7 @@ export function useBoard(boardId: number) {
       await deleteList(listId);
       setBoard({ ...board, lists: board.lists.filter((l) => l.id !== listId) });
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Failed to delete list");
+      setNotice(friendly(err, "Failed to delete list"));
     }
   }
 
@@ -317,7 +325,7 @@ export function useBoard(boardId: number) {
         })),
       });
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Failed to delete card");
+      setNotice(friendly(err, "Failed to delete card"));
     }
   }
 
