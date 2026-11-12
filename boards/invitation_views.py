@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from .models import Board, BoardMembership, Invitation, UserBlock
 from .views import broadcast_board_event
 from .roles import get_role
+from .notifications import notify
 
 MAX_MEMBERS_PER_BOARD = 9
 MAX_PENDING_PER_BOARD = 5
@@ -125,6 +126,8 @@ class BoardInvitationsView(APIView):
             invitation = Invitation.objects.create(
                 board=locked, inviter=request.user, invitee=invitee, role=role,
             )
+        notify(invitee, 'invited', f'{request.user.username} invited you to "{board.name}".', board.id)
+
         return Response(_invite_dict(invitation), status=201)
 
 
@@ -154,6 +157,10 @@ class InvitationDetailView(APIView):
         invitation.status = Invitation.Status.CANCELLED
         invitation.responded_at = timezone.now()
         invitation.save(update_fields=['status', 'responded_at'])
+        notify(
+            invitation.invitee, 'invite_cancelled',
+            f'Your invitation to "{invitation.board.name}" was cancelled.', invitation.board_id,
+        )
         return Response({'detail': 'Invitation cancelled.'})
 
 
@@ -178,7 +185,10 @@ class AcceptInvitationView(APIView):
             invitation.status = Invitation.Status.ACCEPTED
             invitation.responded_at = timezone.now()
             invitation.save(update_fields=['status', 'responded_at'])
-
+        notify(
+            invitation.inviter, 'invite_accepted',
+            f'{request.user.username} accepted your invitation to "{board.name}".', board.id,
+        )
         broadcast_board_event(board.id, 'collaborator_added', request, username=request.user.username)
         return Response({'detail': 'Invitation accepted.', 'board': board.id})
 

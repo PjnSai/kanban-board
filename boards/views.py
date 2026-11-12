@@ -40,6 +40,7 @@ from django.core import signing
 from .models import Board, List, Card, BoardMembership
 from .board_permissions import EditorOrReadOnly
 from .roles import get_role
+from .notifications import notify
 
 DAILY_EMAIL_LIMIT = 300
 
@@ -85,7 +86,11 @@ class BoardViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         if instance.owner != self.request.user:
             raise PermissionDenied("Only the board owner can delete this board.")
+        board_id, name = instance.id, instance.name
+        members = list(instance.collaborators.all())
         instance.delete()
+        for member in members:
+            notify(member, 'board_deleted', f'The board "{name}" was deleted by its owner.', board_id)
 
     @action(detail=True, methods=['get'], url_path='members')
     def members(self, request, pk=None):
@@ -130,6 +135,7 @@ class BoardViewSet(viewsets.ModelViewSet):
 
         board.collaborators.remove(user)
         BoardMembership.objects.filter(board=board, user=user).delete()
+        notify(user, 'removed', f'You were removed from "{board.name}".', board.id)
         disconnect_member(board.id, user.id)
         broadcast_board_event(board.id, 'collaborator_removed', request, username=user.username)
         return Response({'detail': f'{user.username} removed.'}, status=200)
@@ -150,6 +156,7 @@ class BoardViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'That user is not a member of this board.'}, status=400)
 
         BoardMembership.objects.update_or_create(board=board, user=user, defaults={'role': role})
+        notify(user, 'role_changed', f'Your role on "{board.name}" is now {role}.', board.id)
         broadcast_board_event(board.id, 'role_changed', request, username=user.username, role=role)
         return Response({'detail': f'{user.username} is now a {role}.'})
 
