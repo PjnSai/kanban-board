@@ -95,3 +95,17 @@ def test_leaving_removes_membership(setup):
 
     assert response.status_code == 200
     assert not BoardMembership.objects.filter(board=board, user=bob).exists()
+
+@pytest.mark.django_db
+def test_removing_a_member_sends_a_disconnect(setup, monkeypatch):
+    from boards import views
+    alice, bob, carol, board = setup
+    sent = []
+    monkeypatch.setattr(views, 'disconnect_member', lambda board_id, user_id: sent.append((board_id, user_id)))
+
+    client_for(alice).post(f'/api/boards/{board.id}/remove-collaborator/', {'username': 'bob'}, format='json')
+    assert sent == [(board.id, bob.id)]
+
+    board.collaborators.add(carol)
+    client_for(carol).post(f'/api/boards/{board.id}/leave/')
+    assert sent[-1] == (board.id, carol.id)

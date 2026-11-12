@@ -105,6 +105,7 @@ class BoardViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Owners cannot leave their own board. Delete it instead.'}, status=400)
         board.collaborators.remove(request.user)
         BoardMembership.objects.filter(board=board, user=request.user).delete()
+        disconnect_member(board.id, request.user.id)
         broadcast_board_event(board.id, 'collaborator_removed', request, username=request.user.username)
         return Response({'detail': 'You have left the board.'}, status=200)
 
@@ -129,6 +130,7 @@ class BoardViewSet(viewsets.ModelViewSet):
 
         board.collaborators.remove(user)
         BoardMembership.objects.filter(board=board, user=user).delete()
+        disconnect_member(board.id, user.id)
         broadcast_board_event(board.id, 'collaborator_removed', request, username=user.username)
         return Response({'detail': f'{user.username} removed.'}, status=200)
 
@@ -161,6 +163,16 @@ def broadcast_board_event(board_id, event, request, **fields):
         )
     except Exception:
         logger.exception('Live update broadcast failed')
+
+def disconnect_member(board_id, user_id):
+    """Close any live connection this person has open on this board. Never fails the request."""
+    try:
+        async_to_sync(get_channel_layer().group_send)(
+            f'board_{board_id}_user_{user_id}',
+            {'type': 'force_close'},
+        )
+    except Exception:
+        logger.exception('Could not disconnect removed member')
 
 
 class ListViewSet(viewsets.ModelViewSet):
