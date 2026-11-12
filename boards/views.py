@@ -111,6 +111,14 @@ class BoardViewSet(viewsets.ModelViewSet):
         board.collaborators.remove(request.user)
         BoardMembership.objects.filter(board=board, user=request.user).delete()
         disconnect_member(board.id, request.user.id)
+
+        leaver = request.user.username
+        notify(board.owner, 'member_left', f'{leaver} left "{board.name}".', board.id)
+        for manager in User.objects.filter(
+            board_memberships__board=board, board_memberships__role='manager'
+        ):
+            notify(manager, 'member_left', f'{leaver} left "{board.name}".', board.id)
+
         broadcast_board_event(board.id, 'collaborator_removed', request, username=request.user.username)
         return Response({'detail': 'You have left the board.'}, status=200)
 
