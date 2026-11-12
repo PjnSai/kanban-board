@@ -110,6 +110,7 @@ class Notification(models.Model):
         REMOVED = 'removed', 'Removed from a board'
         ROLE_CHANGED = 'role_changed', 'Role changed'
         BOARD_DELETED = 'board_deleted', 'Board deleted'
+        MEMBER_LEFT = 'member_left', 'Member left'
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
     kind = models.CharField(max_length=20, choices=Kind.choices)

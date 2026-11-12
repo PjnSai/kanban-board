@@ -118,3 +118,18 @@ def test_notifications_are_capped_and_old_read_ones_pruned(monkeypatch):
 @pytest.mark.django_db
 def test_notifications_require_login():
     assert APIClient().get('/api/notifications/').status_code == 401
+
+@pytest.mark.django_db
+def test_leaving_notifies_the_owner_and_managers():
+    alice, bob, carol = make_user('alice'), make_user('bob'), make_user('carol')
+    board = Board.objects.create(name='Roadmap', owner=alice)
+    for user, role in ((bob, 'manager'), (carol, 'editor')):
+        board.collaborators.add(user)
+        BoardMembership.objects.create(board=board, user=user, role=role)
+
+    response = client_for(carol).post(f'/api/boards/{board.id}/leave/')
+    assert response.status_code == 200
+
+    assert Notification.objects.filter(user=alice, kind='member_left').count() == 1
+    assert Notification.objects.filter(user=bob, kind='member_left').count() == 1
+    assert not Notification.objects.filter(user=carol).exists()
