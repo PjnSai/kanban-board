@@ -214,7 +214,8 @@ export function useBoard(boardId: number) {
       }
       if (
         data.event === "role_changed" ||
-        data.event === "collaborator_removed"
+        data.event === "collaborator_removed" ||
+        data.event === "access_revoked"
       ) {
         setMembersVersion((v) => v + 1);
         reloadBoard();
