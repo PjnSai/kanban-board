@@ -100,3 +100,27 @@ class UserBlock(models.Model):
 
     def __str__(self):
         return f'{self.blocker} blocked {self.blocked}'
+
+class Notification(models.Model):
+    class Kind(models.TextChoices):
+        INVITED = 'invited', 'Invited'
+        INVITE_CANCELLED = 'invite_cancelled', 'Invitation cancelled'
+        INVITE_ACCEPTED = 'invite_accepted', 'Invitation accepted'
+        ADDED = 'added', 'Added to a board'
+        REMOVED = 'removed', 'Removed from a board'
+        ROLE_CHANGED = 'role_changed', 'Role changed'
+        BOARD_DELETED = 'board_deleted', 'Board deleted'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    message = models.CharField(max_length=300)
+    board_id = models.PositiveIntegerField(null=True, blank=True)  # not a ForeignKey: it must survive the board being deleted
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['user', '-created_at'])]
+
+    def __str__(self):
+        return f'{self.user}: {self.message}'
