@@ -428,3 +428,41 @@ export const removeMember = (boardId: number, username: string) =>
     { username },
     "Could not remove that person",
   );
+
+export interface AppNotification {
+  id: number;
+  kind: string;
+  message: string;
+  board_id: number | null;
+  created_at: string;
+  read: boolean;
+}
+
+export interface NotificationsResponse {
+  unread: number;
+  notifications: AppNotification[];
+}
+
+export const getNotifications = (): Promise<NotificationsResponse> =>
+  invitationRequest(
+    "/notifications/",
+    "GET",
+    undefined,
+    "Could not load notifications",
+  );
+
+export const markNotificationRead = (id: number) =>
+  invitationRequest(
+    `/notifications/${id}/read/`,
+    "POST",
+    undefined,
+    "Could not update the notification",
+  );
+
+export const markAllNotificationsRead = () =>
+  invitationRequest(
+    "/notifications/read-all/",
+    "POST",
+    undefined,
+    "Could not update your notifications",
+  );
