@@ -436,6 +436,7 @@ export interface AppNotification {
   board_id: number | null;
   created_at: string;
   read: boolean;
+  dismissed: boolean;
 }
 
 export interface NotificationsResponse {
@@ -519,4 +520,40 @@ export const getInvitationLimits = (): Promise<InvitationLimits> =>
     "GET",
     undefined,
     "Could not load your invitation limits",
+  );
+
+export const dismissNotification = (id: number) =>
+  invitationRequest(
+    `/notifications/${id}/dismiss/`,
+    "POST",
+    undefined,
+    "Could not clear that notification",
+  );
+
+export const dismissAllNotifications = () =>
+  invitationRequest(
+    "/notifications/dismiss-all/",
+    "POST",
+    undefined,
+    "Could not clear your notifications",
+  );
+
+export const getBellNotifications = (
+  limit: number,
+): Promise<NotificationsResponse & { total: number; bell_total: number }> =>
+  invitationRequest(
+    `/notifications/?scope=bell&limit=${limit}`,
+    "GET",
+    undefined,
+    "Could not load notifications",
+  );
+
+export const getAllNotifications = (): Promise<
+  NotificationsResponse & { total: number }
+> =>
+  invitationRequest(
+    "/notifications/",
+    "GET",
+    undefined,
+    "Could not load notifications",
   );

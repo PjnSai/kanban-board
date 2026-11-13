@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  getNotificationsPreview,
+  getBellNotifications,
   markNotificationRead,
   markAllNotificationsRead,
-  deleteNotification,
-  clearNotifications,
+  dismissNotification,
+  dismissAllNotifications,
 } from "./api";
 import type { AppNotification } from "./api";
-import { useChoose } from "./confirmContext";
 
 const PREVIEW_COUNT = 5;
 
@@ -44,7 +43,6 @@ function destination(n: AppNotification): string {
 
 function NotificationBell() {
   const navigate = useNavigate();
-  const choose = useChoose();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
   const [total, setTotal] = useState(0);
@@ -53,11 +51,11 @@ function NotificationBell() {
   const container = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {
-    getNotificationsPreview(PREVIEW_COUNT)
+    getBellNotifications(PREVIEW_COUNT)
       .then((data) => {
         setItems(data.notifications);
         setUnread(data.unread);
-        setTotal(data.total);
+        setTotal(data.bell_total);
         setError(null);
       })
       .catch(() => setError("Could not load notifications."));
@@ -115,28 +113,22 @@ function NotificationBell() {
     setUnread(0);
   }
 
-  function handleDelete(n: AppNotification) {
-    deleteNotification(n.id)
+  function handleDismiss(n: AppNotification) {
+    dismissNotification(n.id)
       .then(load)
-      .catch(() => setError("Could not delete that notification."));
+      .catch(() => setError("Could not clear that notification."));
     setItems((prev) => prev.filter((item) => item.id !== n.id));
     setTotal((count) => Math.max(0, count - 1));
     if (!n.read) setUnread((count) => Math.max(0, count - 1));
   }
 
-  async function handleClear() {
-    const result = await choose({
-      title: "Clear notifications?",
-      message:
-        "Clearing removes them for good. You can clear only the ones you've already read, or everything.",
-      confirmLabel: "Clear everything",
-      secondaryLabel: "Clear read only",
-      danger: true,
-    });
-    if (result === "cancel") return;
-    clearNotifications(result === "confirm" ? "all" : "read")
+  function handleClear() {
+    dismissAllNotifications()
       .then(load)
       .catch(() => setError("Could not clear your notifications."));
+    setItems([]);
+    setTotal(0);
+    setUnread(0);
   }
 
   return (
@@ -228,10 +220,10 @@ function NotificationBell() {
                     </span>
                   </button>
                   <button
-                    onClick={() => handleDelete(n)}
+                    onClick={() => handleDismiss(n)}
                     className="px-3 py-3 text-slate-300 hover:text-red-600"
-                    title="Delete this notification"
-                    aria-label="Delete this notification"
+                    title="Remove from this list"
+                    aria-label="Remove from this list"
                   >
                     ✕
                   </button>
