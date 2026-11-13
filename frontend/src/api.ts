@@ -466,3 +466,57 @@ export const markAllNotificationsRead = () =>
     undefined,
     "Could not update your notifications",
   );
+
+export interface InvitationLimits {
+  pending_sent: number;
+  max_pending_sent: number;
+  pending_received: number;
+  max_pending_received: number;
+  blocked: number;
+  max_blocks: number;
+  max_members_per_board: number;
+  max_pending_per_board: number;
+  invites_per_hour: number;
+}
+
+export const getNotificationsPreview = (
+  limit: number,
+): Promise<NotificationsResponse & { total: number }> =>
+  invitationRequest(
+    `/notifications/?limit=${limit}`,
+    "GET",
+    undefined,
+    "Could not load notifications",
+  );
+
+export const deleteNotification = (id: number) =>
+  invitationRequest(
+    `/notifications/${id}/`,
+    "DELETE",
+    undefined,
+    "Could not delete the notification",
+  );
+
+export const clearNotifications = (scope: "all" | "read") =>
+  invitationRequest(
+    scope === "read" ? "/notifications/?scope=read" : "/notifications/",
+    "DELETE",
+    undefined,
+    "Could not clear your notifications",
+  );
+
+export const getSentInvitations = (): Promise<Invitation[]> =>
+  invitationRequest(
+    "/invitations/sent/",
+    "GET",
+    undefined,
+    "Could not load sent invitations",
+  );
+
+export const getInvitationLimits = (): Promise<InvitationLimits> =>
+  invitationRequest(
+    "/invitations/limits/",
+    "GET",
+    undefined,
+    "Could not load your invitation limits",
+  );
