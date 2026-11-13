@@ -40,7 +40,7 @@ from django.core import signing
 from .models import Board, List, Card, BoardMembership
 from .board_permissions import EditorOrReadOnly
 from .roles import get_role
-from .notifications import notify
+from .notifications import notify, disconnect_user_sockets
 
 DAILY_EMAIL_LIMIT = 300
 
@@ -484,6 +484,7 @@ def _revoke_refresh_tokens(user):
         [BlacklistedToken(token=t) for t in tokens],
         ignore_conflicts=True,
     )
+    disconnect_user_sockets(user.id)
 
 class PasswordResetConfirmView(APIView):
     permission_classes = [permissions.AllowAny]

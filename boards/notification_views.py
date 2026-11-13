@@ -2,7 +2,8 @@ from django.utils import timezone
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from django.core import signing
+from rest_framework.throttling import ScopedRateThrottle
 from .models import Notification
 
 
@@ -44,3 +45,16 @@ class MarkAllReadView(APIView):
             user=request.user, read_at__isnull=True
         ).update(read_at=timezone.now())
         return Response({'updated': updated})
+
+class NotificationsTicketView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_scope = 'user_ticket'
+
+    def get_throttles(self):
+        throttles = super().get_throttles()
+        throttles.append(ScopedRateThrottle())
+        return throttles
+
+    def get(self, request):
+        ticket = signing.dumps({'user': request.user.id}, salt='ws-user-ticket')
+        return Response({'ticket': ticket})

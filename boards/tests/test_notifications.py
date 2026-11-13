@@ -133,3 +133,65 @@ def test_leaving_notifies_the_owner_and_managers():
     assert Notification.objects.filter(user=alice, kind='member_left').count() == 1
     assert Notification.objects.filter(user=bob, kind='member_left').count() == 1
     assert not Notification.objects.filter(user=carol).exists()
+
+
+@pytest.mark.django_db
+def test_user_ticket_endpoint():
+    from django.core import signing
+    alice = make_user('alice')
+    assert APIClient().get('/api/notifications/ws-ticket/').status_code == 401
+    response = client_for(alice).get('/api/notifications/ws-ticket/')
+    assert response.status_code == 200
+    assert signing.loads(response.data['ticket'], salt='ws-user-ticket', max_age=30) == {'user': alice.id}
+
+
+@pytest.mark.django_db
+def test_user_ticket_is_throttled(monkeypatch):
+    from django.core.cache import cache
+    from rest_framework.throttling import ScopedRateThrottle
+    cache.clear()
+    monkeypatch.setattr(
+        ScopedRateThrottle, 'THROTTLE_RATES',
+        {**ScopedRateThrottle.THROTTLE_RATES, 'user_ticket': '2/hour'},
+    )
+    client = client_for(make_user('alice'))
+    assert client.get('/api/notifications/ws-ticket/').status_code == 200
+    assert client.get('/api/notifications/ws-ticket/').status_code == 200
+    assert client.get('/api/notifications/ws-ticket/').status_code == 429
+
+
+@pytest.mark.django_db
+def test_notify_pushes_a_live_message(monkeypatch):
+    sent = []
+    monkeypatch.setattr(notif_module, 'push_to_user', lambda user_id, message: sent.append((user_id, message)))
+    alice = make_user('alice')
+    notif_module.notify(alice, 'invited', 'bob invited you', board_id=7)
+
+    assert len(sent) == 1
+    user_id, message = sent[0]
+    assert user_id == alice.id
+    assert message['event'] == 'notification' and message['kind'] == 'invited' and message['board_id'] == 7
+
+
+@pytest.mark.django_db
+def test_a_failed_push_does_not_lose_the_notification(monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError('redis down')
+    monkeypatch.setattr(notif_module, 'get_channel_layer', boom)
+    alice = make_user('alice')
+    notif_module.notify(alice, 'invited', 'x')
+    assert Notification.objects.filter(user=alice).count() == 1
+
+
+@pytest.mark.django_db
+def test_changing_password_closes_live_connections(monkeypatch):
+    from boards import views
+    closed = []
+    monkeypatch.setattr(views, 'disconnect_user_sockets', lambda user_id: closed.append(user_id))
+    alice = make_user('alice')
+    client_for(alice).post(
+        '/api/auth/change-password/',
+        {'current_password': 'testpass123', 'new_password': 'Str0ng-Pass-9271'},
+        format='json',
+    )
+    assert closed == [alice.id]
