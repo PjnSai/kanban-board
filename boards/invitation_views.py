@@ -230,3 +230,32 @@ class UnblockView(APIView):
         if not deleted:
             return Response({'detail': 'Not found.'}, status=404)
         return Response({'detail': 'Unblocked.'})
+
+
+class SentInvitationsView(APIView):
+    """Pending invitations you have sent, across all boards."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        pending = Invitation.objects.filter(
+            inviter=request.user, status=PENDING
+        ).select_related('board', 'inviter', 'invitee')
+        return Response([_invite_dict(i) for i in pending])
+
+
+class InvitationLimitsView(APIView):
+    """Your current invitation counts against the limits, for the Invitations page."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        return Response({
+            'pending_sent': Invitation.objects.filter(inviter=request.user, status=PENDING).count(),
+            'max_pending_sent': MAX_PENDING_SENT,
+            'pending_received': Invitation.objects.filter(invitee=request.user, status=PENDING).count(),
+            'max_pending_received': MAX_PENDING_RECEIVED,
+            'blocked': UserBlock.objects.filter(blocker=request.user).count(),
+            'max_blocks': MAX_BLOCKS,
+            'max_members_per_board': MAX_MEMBERS_PER_BOARD,
+            'max_pending_per_board': MAX_PENDING_PER_BOARD,
+            'invites_per_hour': 15,
+        })

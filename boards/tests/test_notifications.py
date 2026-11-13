@@ -195,3 +195,56 @@ def test_changing_password_closes_live_connections(monkeypatch):
         format='json',
     )
     assert closed == [alice.id]
+
+@pytest.mark.django_db
+def test_list_limit_and_total():
+    alice = make_user('alice')
+    for i in range(7):
+        Notification.objects.create(user=alice, kind='invited', message=str(i))
+    data = client_for(alice).get('/api/notifications/?limit=5').data
+    assert len(data['notifications']) == 5 and data['total'] == 7
+    assert len(client_for(alice).get('/api/notifications/?limit=abc').data['notifications']) == 7
+    assert len(client_for(alice).get('/api/notifications/?limit=999').data['notifications']) == 7
+
+
+@pytest.mark.django_db
+def test_delete_one_notification_only_deletes_your_own():
+    alice, bob = make_user('alice'), make_user('bob')
+    mine = Notification.objects.create(user=alice, kind='invited', message='mine')
+    theirs = Notification.objects.create(user=bob, kind='invited', message='theirs')
+
+    assert client_for(alice).delete(f'/api/notifications/{theirs.id}/').status_code == 404
+    assert Notification.objects.filter(pk=theirs.pk).exists()
+    assert client_for(alice).delete(f'/api/notifications/{mine.id}/').status_code == 200
+    assert not Notification.objects.filter(pk=mine.pk).exists()
+
+
+@pytest.mark.django_db
+def test_clear_all_and_clear_read_only():
+    from django.utils import timezone
+    alice, bob = make_user('alice'), make_user('bob')
+    Notification.objects.create(user=alice, kind='invited', message='unread')
+    Notification.objects.create(user=alice, kind='invited', message='read', read_at=timezone.now())
+    Notification.objects.create(user=bob, kind='invited', message='bobs')
+
+    assert client_for(alice).delete('/api/notifications/?scope=read').data['deleted'] == 1
+    assert Notification.objects.filter(user=alice).count() == 1
+    assert client_for(alice).delete('/api/notifications/').data['deleted'] == 1
+    assert Notification.objects.filter(user=alice).count() == 0
+    assert Notification.objects.filter(user=bob).count() == 1
+
+
+@pytest.mark.django_db
+def test_sent_invitations_and_limits_endpoints():
+    alice, bob = make_user('alice'), make_user('bob')
+    board = Board.objects.create(name='Roadmap', owner=alice)
+    client_for(alice).post(f'/api/boards/{board.id}/invitations/', {'username': 'bob'}, format='json')
+
+    sent = client_for(alice).get('/api/invitations/sent/').data
+    assert len(sent) == 1 and sent[0]['invitee'] == 'bob'
+    assert client_for(bob).get('/api/invitations/sent/').data == []
+
+    limits = client_for(alice).get('/api/invitations/limits/').data
+    assert limits['pending_sent'] == 1 and limits['max_pending_sent'] == 15
+    assert client_for(bob).get('/api/invitations/limits/').data['pending_received'] == 1
+    assert APIClient().get('/api/invitations/limits/').status_code == 401
