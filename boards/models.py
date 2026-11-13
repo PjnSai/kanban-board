@@ -118,6 +118,7 @@ class Notification(models.Model):
     board_id = models.PositiveIntegerField(null=True, blank=True)  # not a ForeignKey: it must survive the board being deleted
     created_at = models.DateTimeField(auto_now_add=True)
     read_at = models.DateTimeField(null=True, blank=True)
+    dismissed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
