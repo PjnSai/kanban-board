@@ -436,6 +436,7 @@ export interface AppNotification {
   board_id: number | null;
   created_at: string;
   read: boolean;
+  dismissed: boolean;
 }
 
 export interface NotificationsResponse {
@@ -465,4 +466,94 @@ export const markAllNotificationsRead = () =>
     "POST",
     undefined,
     "Could not update your notifications",
+  );
+
+export interface InvitationLimits {
+  pending_sent: number;
+  max_pending_sent: number;
+  pending_received: number;
+  max_pending_received: number;
+  blocked: number;
+  max_blocks: number;
+  max_members_per_board: number;
+  max_pending_per_board: number;
+  invites_per_hour: number;
+}
+
+export const getNotificationsPreview = (
+  limit: number,
+): Promise<NotificationsResponse & { total: number }> =>
+  invitationRequest(
+    `/notifications/?limit=${limit}`,
+    "GET",
+    undefined,
+    "Could not load notifications",
+  );
+
+export const deleteNotification = (id: number) =>
+  invitationRequest(
+    `/notifications/${id}/`,
+    "DELETE",
+    undefined,
+    "Could not delete the notification",
+  );
+
+export const clearNotifications = (scope: "all" | "read") =>
+  invitationRequest(
+    scope === "read" ? "/notifications/?scope=read" : "/notifications/",
+    "DELETE",
+    undefined,
+    "Could not clear your notifications",
+  );
+
+export const getSentInvitations = (): Promise<Invitation[]> =>
+  invitationRequest(
+    "/invitations/sent/",
+    "GET",
+    undefined,
+    "Could not load sent invitations",
+  );
+
+export const getInvitationLimits = (): Promise<InvitationLimits> =>
+  invitationRequest(
+    "/invitations/limits/",
+    "GET",
+    undefined,
+    "Could not load your invitation limits",
+  );
+
+export const dismissNotification = (id: number) =>
+  invitationRequest(
+    `/notifications/${id}/dismiss/`,
+    "POST",
+    undefined,
+    "Could not clear that notification",
+  );
+
+export const dismissAllNotifications = () =>
+  invitationRequest(
+    "/notifications/dismiss-all/",
+    "POST",
+    undefined,
+    "Could not clear your notifications",
+  );
+
+export const getBellNotifications = (
+  limit: number,
+): Promise<NotificationsResponse & { total: number; bell_total: number }> =>
+  invitationRequest(
+    `/notifications/?scope=bell&limit=${limit}`,
+    "GET",
+    undefined,
+    "Could not load notifications",
+  );
+
+export const getAllNotifications = (): Promise<
+  NotificationsResponse & { total: number }
+> =>
+  invitationRequest(
+    "/notifications/",
+    "GET",
+    undefined,
+    "Could not load notifications",
   );

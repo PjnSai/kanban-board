@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  getNotifications,
+  getBellNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  dismissNotification,
+  dismissAllNotifications,
 } from "./api";
 import type { AppNotification } from "./api";
+
+const PREVIEW_COUNT = 5;
 
 function timeAgo(iso: string) {
   const seconds = Math.max(
@@ -31,6 +35,9 @@ function destination(n: AppNotification): string {
   if (n.board_id && !boardGoneOrOnDashboard.includes(n.kind)) {
     return `/boards/${n.board_id}`;
   }
+  if (n.kind === "invited" || n.kind === "invite_cancelled") {
+    return "/invitations";
+  }
   return "/";
 }
 
@@ -38,15 +45,17 @@ function NotificationBell() {
   const navigate = useNavigate();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
+  const [total, setTotal] = useState(0);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const container = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {
-    getNotifications()
+    getBellNotifications(PREVIEW_COUNT)
       .then((data) => {
         setItems(data.notifications);
         setUnread(data.unread);
+        setTotal(data.bell_total);
         setError(null);
       })
       .catch(() => setError("Could not load notifications."));
@@ -104,6 +113,24 @@ function NotificationBell() {
     setUnread(0);
   }
 
+  function handleDismiss(n: AppNotification) {
+    dismissNotification(n.id)
+      .then(load)
+      .catch(() => setError("Could not clear that notification."));
+    setItems((prev) => prev.filter((item) => item.id !== n.id));
+    setTotal((count) => Math.max(0, count - 1));
+    if (!n.read) setUnread((count) => Math.max(0, count - 1));
+  }
+
+  function handleClear() {
+    dismissAllNotifications()
+      .then(load)
+      .catch(() => setError("Could not clear your notifications."));
+    setItems([]);
+    setTotal(0);
+    setUnread(0);
+  }
+
   return (
     <div ref={container} className="relative">
       <button
@@ -135,18 +162,28 @@ function NotificationBell() {
 
       {open && (
         <div className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-lg z-40">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100">
+          <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-slate-100">
             <h3 className="text-sm font-semibold text-slate-700">
               Notifications
             </h3>
-            {unread > 0 && (
-              <button
-                onClick={handleMarkAll}
-                className="text-xs text-blue-600 hover:underline"
-              >
-                Mark all as read
-              </button>
-            )}
+            <div className="flex gap-3">
+              {unread > 0 && (
+                <button
+                  onClick={handleMarkAll}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Mark all as read
+                </button>
+              )}
+              {total > 0 && (
+                <button
+                  onClick={handleClear}
+                  className="text-xs text-slate-500 hover:text-red-600 hover:underline"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
 
           {error && <p className="px-4 py-3 text-sm text-red-600">{error}</p>}
@@ -156,14 +193,17 @@ function NotificationBell() {
               You're all caught up.
             </p>
           ) : (
-            <ul className="max-h-96 overflow-y-auto">
+            <ul>
               {items.map((n) => (
-                <li key={n.id}>
+                <li
+                  key={n.id}
+                  className={`flex items-start border-b border-slate-50 ${
+                    n.read ? "" : "bg-blue-50"
+                  }`}
+                >
                   <button
                     onClick={() => handleClick(n)}
-                    className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 flex gap-2 ${
-                      n.read ? "" : "bg-blue-50"
-                    }`}
+                    className="flex-1 min-w-0 text-left px-4 py-3 hover:bg-slate-50 flex gap-2"
                   >
                     <span
                       className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
@@ -179,10 +219,29 @@ function NotificationBell() {
                       </span>
                     </span>
                   </button>
+                  <button
+                    onClick={() => handleDismiss(n)}
+                    className="px-3 py-3 text-slate-300 hover:text-red-600"
+                    title="Remove from this list"
+                    aria-label="Remove from this list"
+                  >
+                    ✕
+                  </button>
                 </li>
               ))}
             </ul>
           )}
+
+          <div className="px-4 py-2 border-t border-slate-100 text-center">
+            <Link
+              to="/notifications"
+              onClick={() => setOpen(false)}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              View all notifications
+              {total > PREVIEW_COUNT ? ` (${total})` : ""}
+            </Link>
+          </div>
         </div>
       )}
     </div>
