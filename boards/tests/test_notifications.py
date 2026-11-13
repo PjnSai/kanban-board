@@ -248,3 +248,39 @@ def test_sent_invitations_and_limits_endpoints():
     assert limits['pending_sent'] == 1 and limits['max_pending_sent'] == 15
     assert client_for(bob).get('/api/invitations/limits/').data['pending_received'] == 1
     assert APIClient().get('/api/invitations/limits/').status_code == 401
+
+@pytest.mark.django_db
+def test_dismissing_hides_from_the_bell_but_keeps_it_on_the_page():
+    alice, bob = make_user('alice'), make_user('bob')
+    first = Notification.objects.create(user=alice, kind='invited', message='one')
+    Notification.objects.create(user=alice, kind='invited', message='two')
+    other = Notification.objects.create(user=bob, kind='invited', message='bobs')
+
+    client = client_for(alice)
+    assert client.post(f'/api/notifications/{other.id}/dismiss/').status_code == 404
+    assert client.post(f'/api/notifications/{first.id}/dismiss/').status_code == 200
+
+    bell = client.get('/api/notifications/?scope=bell').data
+    assert [n['message'] for n in bell['notifications']] == ['two']
+    assert bell['unread'] == 1 and bell['total'] == 2 and bell['bell_total'] == 1
+
+    page = client.get('/api/notifications/').data
+    assert {n['message']: n['dismissed'] for n in page['notifications']} == {'one': True, 'two': False}
+    first.refresh_from_db()
+    assert first.read_at is not None  # dismissing also marks it read
+
+
+@pytest.mark.django_db
+def test_dismiss_all_then_clear_everything_deletes_for_good():
+    alice = make_user('alice')
+    for i in range(3):
+        Notification.objects.create(user=alice, kind='invited', message=str(i))
+
+    client = client_for(alice)
+    assert client.post('/api/notifications/dismiss-all/').data['dismissed'] == 3
+    bell = client.get('/api/notifications/?scope=bell').data
+    assert bell['notifications'] == [] and bell['unread'] == 0 and bell['bell_total'] == 0
+    assert client.get('/api/notifications/').data['total'] == 3
+
+    assert client.delete('/api/notifications/').data['deleted'] == 3
+    assert client.get('/api/notifications/').data['total'] == 0

@@ -7,7 +7,7 @@ from .invitation_views import (
 )
 from .notification_views import (
     NotificationsView, NotificationDetailView, MarkReadView,
-    MarkAllReadView, NotificationsTicketView,
+    MarkAllReadView, NotificationsTicketView, DismissView, DismissAllView,
 )
 
 router = DefaultRouter()
@@ -40,5 +40,7 @@ urlpatterns = router.urls + [
     path('notifications/<int:pk>/read/', MarkReadView.as_view(), name='notification-read'),
     path('notifications/ws-ticket/', NotificationsTicketView.as_view(), name='notifications-ws-ticket'),
     path('notifications/<int:pk>/', NotificationDetailView.as_view(), name='notification-detail'),
+    path('notifications/dismiss-all/', DismissAllView.as_view(), name='notifications-dismiss-all'),
+    path('notifications/<int:pk>/dismiss/', DismissView.as_view(), name='notification-dismiss'),
     
 ]

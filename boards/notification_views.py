@@ -16,6 +16,7 @@ def _row(n):
         'board_id': n.board_id,
         'created_at': n.created_at,
         'read': n.read_at is not None,
+        'dismissed': n.dismissed_at is not None,
     }
 
 
@@ -28,13 +29,20 @@ class NotificationsView(APIView):
         except ValueError:
             limit = 50
         limit = max(1, min(limit, 50))
-        rows = Notification.objects.filter(user=request.user)[:limit]
-        unread = Notification.objects.filter(user=request.user, read_at__isnull=True).count()
-        total = Notification.objects.filter(user=request.user).count()
-        return Response({'unread': unread, 'total': total, 'notifications': [_row(n) for n in rows]})
+
+        mine = Notification.objects.filter(user=request.user)
+        rows = mine
+        if request.query_params.get('scope') == 'bell':
+            rows = mine.filter(dismissed_at__isnull=True)
+        return Response({
+            'unread': mine.filter(read_at__isnull=True).count(),
+            'total': mine.count(),
+            'bell_total': mine.filter(dismissed_at__isnull=True).count(),
+            'notifications': [_row(n) for n in rows[:limit]],
+        })
 
     def delete(self, request):
-        """Clear notifications. ?scope=read clears only read ones; anything else clears all."""
+        """Permanently clear notifications. ?scope=read clears only read ones; anything else clears all."""
         queryset = Notification.objects.filter(user=request.user)
         if request.query_params.get('scope') == 'read':
             queryset = queryset.filter(read_at__isnull=False)
@@ -50,6 +58,33 @@ class NotificationDetailView(APIView):
         if not deleted:
             return Response({'detail': 'Not found.'}, status=404)
         return Response({'deleted': deleted})
+
+
+class DismissView(APIView):
+    """Hide one notification from the bell. It stays on the Notifications page, marked read."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        notification = Notification.objects.filter(pk=pk, user=request.user).first()
+        if notification is None:
+            return Response({'detail': 'Not found.'}, status=404)
+        now = timezone.now()
+        notification.dismissed_at = notification.dismissed_at or now
+        notification.read_at = notification.read_at or now
+        notification.save(update_fields=['dismissed_at', 'read_at'])
+        return Response({'dismissed': 1})
+
+
+class DismissAllView(APIView):
+    """Hide everything from the bell. Nothing is deleted."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        now = timezone.now()
+        queryset = Notification.objects.filter(user=request.user, dismissed_at__isnull=True)
+        queryset.filter(read_at__isnull=True).update(read_at=now)
+        dismissed = queryset.update(dismissed_at=now)
+        return Response({'dismissed': dismissed})
 
 
 class MarkReadView(APIView):
