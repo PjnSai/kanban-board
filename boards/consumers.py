@@ -7,7 +7,7 @@ from django.core import signing
 from django.db.models import Q
 
 from boards.models import Board
-
+from django.contrib.auth.models import User
 
 @database_sync_to_async
 def is_member(user_id, board_id):
@@ -59,3 +59,43 @@ class BoardConsumer(AsyncWebsocketConsumer):
         # Tell the page why, then close. Sent when the person is removed from the board.
         await self.send(text_data=json.dumps({'event': 'access_revoked'}))
         await self.close(code=4403)
+
+@database_sync_to_async
+def user_is_active(user_id):
+    return User.objects.filter(pk=user_id, is_active=True).exists()
+
+
+class UserConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.group_name = None
+
+        query = parse_qs(self.scope['query_string'].decode())
+        ticket = (query.get('ticket') or [''])[0]
+        try:
+            payload = signing.loads(ticket, salt='ws-user-ticket', max_age=30)
+        except signing.BadSignature:
+            await self.close(code=4401)
+            return
+
+        user_id = payload.get('user')
+        if not await user_is_active(user_id):
+            await self.close(code=4403)
+            return
+
+        self.group_name = f'user_{user_id}'
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        if self.group_name:
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+    async def receive(self, text_data=None, bytes_data=None):
+        # Clients never publish; the server pushes
+        return
+
+    async def user_message(self, event):
+        await self.send(text_data=json.dumps(event['message']))
+
+    async def force_close(self, event):
+        await self.close(code=4401)

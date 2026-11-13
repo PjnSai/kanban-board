@@ -5,7 +5,7 @@ from .invitation_views import (
     BoardInvitationsView, MyInvitationsView, InvitationDetailView,
     AcceptInvitationView, DeclineInvitationView, BlocksView, UnblockView,
 )
-from .notification_views import NotificationsView, MarkReadView, MarkAllReadView
+from .notification_views import NotificationsView, MarkReadView, MarkAllReadView, NotificationsTicketView
 
 router = DefaultRouter()
 router.register(r'boards', BoardViewSet, basename='board')
@@ -33,4 +33,5 @@ urlpatterns = router.urls + [
     path('notifications/', NotificationsView.as_view(), name='notifications'),
     path('notifications/read-all/', MarkAllReadView.as_view(), name='notifications-read-all'),
     path('notifications/<int:pk>/read/', MarkReadView.as_view(), name='notification-read'),
+    path('notifications/ws-ticket/', NotificationsTicketView.as_view(), name='notifications-ws-ticket'),
 ]
