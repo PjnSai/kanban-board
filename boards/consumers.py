@@ -65,6 +65,7 @@ class BoardConsumer(AsyncWebsocketConsumer):
         self.board_id = self.scope['url_route']['kwargs']['board_id']
         self.group_name = f'board_{self.board_id}'
         self.user_group = None
+        self.account_group = None
         self.user_id = None
         self.joined = False
 
@@ -84,9 +85,11 @@ class BoardConsumer(AsyncWebsocketConsumer):
 
         self.user_id = payload['user']
         self.user_group = f"board_{self.board_id}_user_{self.user_id}"
+        self.account_group = f"user_{self.user_id}"
         await board_connections.add(self.user_id, self)
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.channel_layer.group_add(self.user_group, self.channel_name)
+        await self.channel_layer.group_add(self.account_group, self.channel_name)
         self.joined = True
         await self.accept()
 
@@ -96,6 +99,7 @@ class BoardConsumer(AsyncWebsocketConsumer):
         if self.joined:
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
             await self.channel_layer.group_discard(self.user_group, self.channel_name)
+            await self.channel_layer.group_discard(self.account_group, self.channel_name)
 
     async def receive(self, text_data=None, bytes_data=None):
         # Clients never publish; only the server broadcasts, from the REST views
@@ -104,8 +108,12 @@ class BoardConsumer(AsyncWebsocketConsumer):
     async def board_message(self, event):
         await self.send(text_data=json.dumps(event['message']))
 
+    async def user_message(self, event):
+        # Messages for the per-user notification channel are not for board pages
+        return
+
     async def force_close(self, event):
-        # Tell the page why, then close. Sent when the person is removed from the board.
+        # Tell the page why, then close
         await self.send(text_data=json.dumps({'event': 'access_revoked'}))
         await self.close(code=4403)
 

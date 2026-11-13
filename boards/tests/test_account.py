@@ -301,3 +301,13 @@ def test_register_is_throttled(api_client):
         'password': STRONG_PASSWORD,
     }, format='json')
     assert response.status_code == 429
+
+
+@pytest.mark.django_db
+def test_admin_site_is_reachable_at_its_configured_address():
+    import os
+    path = '/' + os.environ.get('ADMIN_URL', 'admin/')
+    response = APIClient().get(path)
+    # The admin redirects anonymous visitors to its login page
+    assert response.status_code == 302
+    assert path + 'login/' in response['Location']

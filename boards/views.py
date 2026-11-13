@@ -170,7 +170,7 @@ class BoardViewSet(viewsets.ModelViewSet):
 
 def broadcast_board_event(board_id, event, request, **fields):
     """Send a live update to everyone watching a board. A Redis problem must never fail the request."""
-    message = {'event': event, 'origin': request.headers.get('X-Client-Id', ''), **fields}
+    message = {'event': event, 'origin': request.headers.get('X-Client-Id', '')[:64], **fields}
     try:
         async_to_sync(get_channel_layer().group_send)(
             f'board_{board_id}',

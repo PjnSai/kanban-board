@@ -20,10 +20,17 @@ MAX_PENDING_RECEIVED = 10
 MAX_BLOCKS = 50
 MAX_PENDING_PER_MANAGER = 3
 REINVITE_WAIT = timedelta(hours=24)
+INVITE_LIFETIME = timedelta(days=14)
 
 CANT_INVITE = "This user can't be invited right now."
 PENDING = Invitation.Status.PENDING
 
+def expire_old_invitations():
+    """Cancel pending invitations older than 14 days so they stop using up the limits."""
+    cutoff = timezone.now() - INVITE_LIFETIME
+    Invitation.objects.filter(status=PENDING, created_at__lt=cutoff).update(
+        status=Invitation.Status.CANCELLED, responded_at=timezone.now()
+    )
 
 def _visible_board(user, board_id):
     return Board.objects.filter(
@@ -59,6 +66,7 @@ class BoardInvitationsView(APIView):
         return throttles
 
     def get(self, request, board_id):
+        expire_old_invitations()
         board = _visible_board(request.user, board_id)
         if board is None:
             return Response({'detail': 'Not found.'}, status=404)
@@ -71,6 +79,7 @@ class BoardInvitationsView(APIView):
         return Response([_invite_dict(i) for i in pending])
 
     def post(self, request, board_id):
+        expire_old_invitations()
         board = _visible_board(request.user, board_id)
         if board is None:
             return Response({'detail': 'Not found.'}, status=404)
@@ -135,6 +144,7 @@ class MyInvitationsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        expire_old_invitations()
         pending = Invitation.objects.filter(
             invitee=request.user, status=PENDING
         ).select_related('board', 'inviter', 'invitee')
@@ -237,6 +247,7 @@ class SentInvitationsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        expire_old_invitations()
         pending = Invitation.objects.filter(
             inviter=request.user, status=PENDING
         ).select_related('board', 'inviter', 'invitee')

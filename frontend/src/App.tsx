@@ -42,15 +42,6 @@ function App() {
           path="*"
           element={<AuthForm onSuccess={() => setLoggedIn(true)} />}
         />
-        <Route
-          path="*"
-          element={
-            <PageMessage
-              title="Page not found"
-              message="That page doesn't exist."
-            />
-          }
-        />
       </Routes>
     );
   }
