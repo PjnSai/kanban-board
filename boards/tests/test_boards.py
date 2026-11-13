@@ -109,3 +109,24 @@ def test_removing_a_member_sends_a_disconnect(setup, monkeypatch):
     board.collaborators.add(carol)
     client_for(carol).post(f'/api/boards/{board.id}/leave/')
     assert sent[-1] == (board.id, carol.id)
+    
+@pytest.mark.django_db
+def test_client_id_header_is_trimmed_in_broadcasts(setup, monkeypatch):
+    from boards import views
+    alice, bob, carol, board = setup
+    sent = []
+
+    class FakeLayer:
+        async def group_send(self, group, message):
+            sent.append(message)
+
+    monkeypatch.setattr(views, 'get_channel_layer', lambda: FakeLayer())
+
+    client = client_for(alice)
+    response = client.post(
+        '/api/lists/', {'board': board.id, 'name': 'L', 'position': 0}, format='json',
+        HTTP_X_CLIENT_ID='x' * 500,
+    )
+    assert response.status_code == 201
+    assert len(sent) == 1
+    assert len(sent[0]['message']['origin']) == 64
