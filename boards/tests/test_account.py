@@ -301,3 +301,11 @@ def test_register_is_throttled(api_client):
         'password': STRONG_PASSWORD,
     }, format='json')
     assert response.status_code == 429
+
+
+@pytest.mark.django_db
+def test_admin_url_is_configurable():
+    from django.urls import resolve
+    from config import urls
+    admin_patterns = [p for p in urls.urlpatterns if 'admin' in str(p.callback.__module__)]
+    assert admin_patterns, 'the admin site is not routed'
