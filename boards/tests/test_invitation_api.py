@@ -271,3 +271,18 @@ def test_a_demoted_manager_cannot_cancel(people):
 
     BoardMembership.objects.filter(board=board, user=manager).update(role='viewer')
     assert client_for(manager).delete(f'/api/invitations/{sent}/').status_code == 404
+
+
+@pytest.mark.django_db
+def test_old_pending_invitations_expire_and_free_their_slot(people):
+    from datetime import timedelta
+    alice, bob, carol = people
+    board = Board.objects.create(name='B', owner=alice)
+    invitation_id = invite(client_for(alice), board, 'bob').data['id']
+
+    Invitation.objects.filter(pk=invitation_id).update(created_at=timezone.now() - timedelta(days=15))
+
+    assert client_for(bob).get('/api/invitations/').data == []
+    assert Invitation.objects.get(pk=invitation_id).status == 'cancelled'
+    assert client_for(bob).post(f'/api/invitations/{invitation_id}/accept/').status_code == 404
+    assert invite(client_for(alice), board, 'bob').status_code == 201
