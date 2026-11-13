@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Routes, Route, Link } from "react-router-dom";
 import AuthForm from "./AuthForm";
 import { isLoggedIn, logout } from "./auth";
@@ -9,9 +9,27 @@ import ProfilePage from "./ProfilePage";
 import { ConfirmProvider } from "./ConfirmDialog";
 import PageMessage from "./PageMessage";
 import NotificationBell from "./NotificationBell";
+import NotificationsPage from "./NotificationsPage";
+import InvitationsPage from "./InvitationsPage";
+import { getMyInvitations } from "./api";
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
+  const [pendingInvites, setPendingInvites] = useState(0);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    const load = () =>
+      getMyInvitations()
+        .then((list) => setPendingInvites(list.length))
+        .catch(() => {});
+    load();
+    function onVisible() {
+      if (document.visibilityState === "visible") load();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loggedIn]);
 
   if (!loggedIn) {
     return (
@@ -50,6 +68,17 @@ function App() {
           <div className="flex items-center gap-4">
             <NotificationBell />
             <Link
+              to="/invitations"
+              className="text-sm text-slate-500 hover:text-blue-600 transition-colors"
+            >
+              Invitations
+              {pendingInvites > 0 && (
+                <span className="ml-1 rounded-full bg-red-600 text-white text-[10px] font-semibold px-1.5 py-0.5">
+                  {pendingInvites}
+                </span>
+              )}
+            </Link>
+            <Link
               to="/profile"
               className="text-sm text-slate-500 hover:text-blue-600 transition-colors"
             >
@@ -74,6 +103,8 @@ function App() {
               path="/profile"
               element={<ProfilePage onLoggedOut={() => setLoggedIn(false)} />}
             />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/invitations" element={<InvitationsPage />} />
             <Route
               path="*"
               element={
