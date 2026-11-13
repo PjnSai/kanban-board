@@ -3,9 +3,12 @@ from .views import BoardViewSet, ListViewSet, CardViewSet, RegisterView, LogoutV
 from django.urls import path
 from .invitation_views import (
     BoardInvitationsView, MyInvitationsView, InvitationDetailView,
-    AcceptInvitationView, DeclineInvitationView, BlocksView, UnblockView,
+    AcceptInvitationView, DeclineInvitationView, BlocksView, UnblockView, SentInvitationsView, InvitationLimitsView
 )
-from .notification_views import NotificationsView, MarkReadView, MarkAllReadView, NotificationsTicketView
+from .notification_views import (
+    NotificationsView, NotificationDetailView, MarkReadView,
+    MarkAllReadView, NotificationsTicketView,
+)
 
 router = DefaultRouter()
 router.register(r'boards', BoardViewSet, basename='board')
@@ -25,6 +28,8 @@ urlpatterns = router.urls + [
     path('boards/<int:board_id>/ws-ticket/', WebSocketTicketView.as_view(), name='ws-ticket'),
     path('boards/<int:board_id>/invitations/', BoardInvitationsView.as_view(), name='board-invitations'),
     path('invitations/', MyInvitationsView.as_view(), name='my-invitations'),
+    path('invitations/sent/', SentInvitationsView.as_view(), name='invitations-sent'),
+    path('invitations/limits/', InvitationLimitsView.as_view(), name='invitation-limits'),
     path('invitations/<int:pk>/', InvitationDetailView.as_view(), name='invitation-detail'),
     path('invitations/<int:pk>/accept/', AcceptInvitationView.as_view(), name='invitation-accept'),
     path('invitations/<int:pk>/decline/', DeclineInvitationView.as_view(), name='invitation-decline'),
@@ -34,4 +39,6 @@ urlpatterns = router.urls + [
     path('notifications/read-all/', MarkAllReadView.as_view(), name='notifications-read-all'),
     path('notifications/<int:pk>/read/', MarkReadView.as_view(), name='notification-read'),
     path('notifications/ws-ticket/', NotificationsTicketView.as_view(), name='notifications-ws-ticket'),
+    path('notifications/<int:pk>/', NotificationDetailView.as_view(), name='notification-detail'),
+    
 ]
