@@ -8,6 +8,7 @@ import ResetPasswordPage from "./ResetPasswordPage";
 import ProfilePage from "./ProfilePage";
 import { ConfirmProvider } from "./ConfirmDialog";
 import PageMessage from "./PageMessage";
+import NotificationBell from "./NotificationBell";
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
@@ -47,6 +48,7 @@ function App() {
             My Boards
           </Link>
           <div className="flex items-center gap-4">
+            <NotificationBell />
             <Link
               to="/profile"
               className="text-sm text-slate-500 hover:text-blue-600 transition-colors"
@@ -71,6 +73,15 @@ function App() {
             <Route
               path="/profile"
               element={<ProfilePage onLoggedOut={() => setLoggedIn(false)} />}
+            />
+            <Route
+              path="*"
+              element={
+                <PageMessage
+                  title="Page not found"
+                  message="That page doesn't exist."
+                />
+              }
             />
           </Routes>
         </main>
