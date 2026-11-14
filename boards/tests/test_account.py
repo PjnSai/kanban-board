@@ -311,3 +311,38 @@ def test_admin_site_is_reachable_at_its_configured_address():
     # The admin redirects anonymous visitors to its login page
     assert response.status_code == 302
     assert path + 'login/' in response['Location']
+
+@pytest.mark.django_db
+def test_deleting_an_account_notifies_members_and_closes_connections(api_client, monkeypatch):
+    from boards import views
+    from boards.models import Board, BoardMembership, Notification
+
+    closed, revoked = [], []
+    monkeypatch.setattr(views, 'disconnect_member', lambda board_id, user_id: closed.append((board_id, user_id)))
+    monkeypatch.setattr(views, 'disconnect_user_sockets', lambda user_id: revoked.append(user_id))
+
+    alice = User.objects.create_user(username='alice', email='alice@example.com', password='testpass123')
+    bob = User.objects.create_user(username='bob', email='bob@example.com', password='testpass123')
+    carol = User.objects.create_user(username='carol', email='carol@example.com', password='testpass123')
+    dave = User.objects.create_user(username='dave', email='dave@example.com', password='testpass123')
+
+    owned = Board.objects.create(name='Alice board', owner=alice)
+    owned.collaborators.add(bob)
+    BoardMembership.objects.create(board=owned, user=bob, role='editor')
+
+    joined = Board.objects.create(name='Carol board', owner=carol)
+    for member, role in ((alice, 'editor'), (dave, 'manager')):
+        joined.collaborators.add(member)
+        BoardMembership.objects.create(board=joined, user=member, role=role)
+
+    authenticate(api_client, alice)
+    response = api_client.delete('/api/auth/delete-account/', {'password': 'testpass123'}, format='json')
+    assert response.status_code == 204
+
+    assert not User.objects.filter(pk=alice.pk).exists()
+    assert not Board.objects.filter(pk=owned.pk).exists()
+    assert Notification.objects.filter(user=bob, kind='board_deleted').count() == 1
+    assert Notification.objects.filter(user=carol, kind='member_left').count() == 1
+    assert Notification.objects.filter(user=dave, kind='member_left').count() == 1
+    assert (owned.id, bob.id) in closed
+    assert revoked == [alice.id]

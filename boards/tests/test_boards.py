@@ -130,3 +130,15 @@ def test_client_id_header_is_trimmed_in_broadcasts(setup, monkeypatch):
     assert response.status_code == 201
     assert len(sent) == 1
     assert len(sent[0]['message']['origin']) == 64
+
+@pytest.mark.django_db
+def test_deleting_a_board_disconnects_its_members(setup, monkeypatch):
+    from boards import views
+    alice, bob, carol, board = setup
+    closed = []
+    monkeypatch.setattr(views, 'disconnect_member', lambda board_id, user_id: closed.append((board_id, user_id)))
+
+    response = client_for(alice).delete(f'/api/boards/{board.id}/')
+
+    assert response.status_code == 204
+    assert closed == [(board.id, bob.id)]
