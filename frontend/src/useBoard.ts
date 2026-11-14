@@ -9,6 +9,7 @@ import {
   deleteCard,
   clientId,
   getWsTicket,
+  updateCardDescription,
 } from "./api";
 import { useConfirm } from "./confirmContext";
 import { openLiveSocket } from "./liveSocket";
@@ -17,6 +18,7 @@ interface Card {
   id: number;
   title: string;
   position: number;
+  description?: string;
 }
 interface List {
   id: number;
@@ -348,6 +350,29 @@ export function useBoard(boardId: number) {
     }
   }
 
+  async function saveCardDescription(cardId: number, description: string) {
+    try {
+      await updateCardDescription(cardId, description);
+      setBoard((prev) =>
+        prev
+          ? {
+              ...prev,
+              lists: prev.lists.map((l) => ({
+                ...l,
+                cards: l.cards.map((c) =>
+                  c.id === cardId ? { ...c, description } : c,
+                ),
+              })),
+            }
+          : prev,
+      );
+      return true;
+    } catch (err) {
+      setNotice(friendly(err, "Failed to save the description"));
+      return false;
+    }
+  }
+
   return {
     board,
     setBoard,
@@ -376,5 +401,6 @@ export function useBoard(boardId: number) {
     saveEditCard,
     handleDeleteList,
     handleDeleteCard,
+    saveCardDescription,
   };
 }

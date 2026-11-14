@@ -20,6 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { updateCard, updateListPosition } from "./api";
 import PageMessage from "./PageMessage";
+import CardDetailDialog from "./CardDetailDialog";
 
 interface Card {
   id: number;
@@ -58,9 +59,12 @@ function BoardView() {
     saveEditCard,
     handleDeleteList,
     handleDeleteCard,
+    saveCardDescription,
   } = useBoard(boardId);
 
   const [activeCard, setActiveCard] = useState<Card | null>(null);
+  const [openCardId, setOpenCardId] = useState<number | null>(null);
+
   const canEdit =
     board?.my_role === "owner" ||
     board?.my_role === "manager" ||
@@ -213,6 +217,10 @@ function BoardView() {
     );
   if (!board) return null;
 
+  const openCard =
+    board.lists.flatMap((l) => l.cards).find((c) => c.id === openCardId) ??
+    null;
+
   return (
     <div>
       <h2 className="text-lg font-medium text-slate-700 mb-2">{board.name}</h2>
@@ -281,6 +289,7 @@ function BoardView() {
                 onDeleteList={() => handleDeleteList(list.id)}
                 onDeleteCard={handleDeleteCard}
                 canEdit={canEdit}
+                onOpenCard={setOpenCardId}
               />
             ))}
           </SortableContext>
@@ -314,6 +323,16 @@ function BoardView() {
             Add List
           </button>
         </form>
+      )}
+      {openCard && (
+        <CardDetailDialog
+          key={openCard.id}
+          title={openCard.title}
+          description={openCard.description ?? ""}
+          canEdit={canEdit}
+          onSave={(text) => saveCardDescription(openCard.id, text)}
+          onClose={() => setOpenCardId(null)}
+        />
       )}
     </div>
   );

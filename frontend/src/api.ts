@@ -567,3 +567,11 @@ export async function getUserWsTicket(): Promise<string> {
   );
   return data.ticket;
 }
+
+export const updateCardDescription = (cardId: number, description: string) =>
+  invitationRequest(
+    `/cards/${cardId}/`,
+    "PATCH",
+    { description },
+    "Could not save the description",
+  );

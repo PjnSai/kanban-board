@@ -11,6 +11,7 @@ interface CardType {
   id: number;
   title: string;
   position: number;
+  description?: string;
 }
 
 interface ListColumnProps {
@@ -33,6 +34,7 @@ interface ListColumnProps {
   onDeleteList: () => void;
   onDeleteCard: (cardId: number) => void;
   canEdit: boolean;
+  onOpenCard: (cardId: number) => void;
 }
 
 function ListColumn({
@@ -55,6 +57,7 @@ function ListColumn({
   onDeleteList,
   onDeleteCard,
   canEdit,
+  onOpenCard,
 }: ListColumnProps) {
   const { setNodeRef: setDroppableRef } = useDroppable({ id: `list-${id}` });
   const {
@@ -137,6 +140,8 @@ function ListColumn({
               onSaveEdit={() => onSaveEditCard(card.id)}
               onDelete={() => onDeleteCard(card.id)}
               canEdit={canEdit}
+              hasDescription={!!card.description}
+              onOpen={() => onOpenCard(card.id)}
             />
           ))}
         </SortableContext>
