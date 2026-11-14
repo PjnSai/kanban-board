@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getMyInvitations,
   acceptInvitation,
@@ -6,13 +6,14 @@ import {
   ApiError,
 } from "./api";
 import type { Invitation } from "./api";
+import { onLiveEvent } from "./liveEvents";
 
 function InvitesBox({ onAccepted }: { onAccepted: () => void }) {
   const [invites, setInvites] = useState<Invitation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     getMyInvitations()
       .then(setInvites)
       .catch((err) =>
@@ -21,6 +22,15 @@ function InvitesBox({ onAccepted }: { onAccepted: () => void }) {
         ),
       );
   }, []);
+
+  useEffect(() => {
+    load();
+    return onLiveEvent((message) => {
+      if (message.event === "notification" || message.event === "resync") {
+        load();
+      }
+    });
+  }, [load]);
 
   async function respond(id: number, action: "accept" | "decline" | "block") {
     if (busyId !== null) return;

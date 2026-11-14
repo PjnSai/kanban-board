@@ -9,6 +9,7 @@ import {
 } from "./api";
 import type { AppNotification } from "./api";
 import { useChoose } from "./confirmContext";
+import { onLiveEvent } from "./liveEvents";
 
 function timeAgo(iso: string) {
   const seconds = Math.max(
@@ -57,7 +58,15 @@ function NotificationsPage() {
       if (document.visibilityState === "visible") load();
     }
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    const stopListening = onLiveEvent((message) => {
+      if (message.event === "notification" || message.event === "resync") {
+        load();
+      }
+    });
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      stopListening();
+    };
   }, [load]);
 
   const shown = filter === "unread" ? items.filter((n) => !n.read) : items;
