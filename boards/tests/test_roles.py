@@ -224,3 +224,50 @@ def test_board_payload_includes_my_role(world):
     for who in ('owner', 'manager', 'editor', 'viewer'):
         data = client_for(world[who]).get(f'/api/boards/{board.id}/').data
         assert data['my_role'] == who
+
+@pytest.mark.django_db
+def test_reorder_saves_everything_in_one_request(world):
+    board, first_list, card = world['board'], world['list'], world['card']
+    second_list = List.objects.create(board=board, name='Done', position=1)
+    other_card = Card.objects.create(list=first_list, title='Other', position=1)
+
+    response = client_for(world['editor']).post(
+        f'/api/boards/{board.id}/reorder/',
+        {
+            'lists': [second_list.id, first_list.id],
+            'cards': [
+                {'list': second_list.id, 'cards': [card.id]},
+                {'list': first_list.id, 'cards': [other_card.id]},
+            ],
+        },
+        format='json',
+    )
+
+    assert response.status_code == 200
+    for obj in (first_list, second_list, card, other_card):
+        obj.refresh_from_db()
+    assert (second_list.position, first_list.position) == (0, 1)
+    assert (card.list_id, card.position) == (second_list.id, 0)
+    assert (other_card.list_id, other_card.position) == (first_list.id, 0)
+
+
+@pytest.mark.django_db
+def test_reorder_permissions_and_validation(world):
+    board, lst, card = world['board'], world['list'], world['card']
+    url = f'/api/boards/{board.id}/reorder/'
+    body = {'lists': [lst.id], 'cards': [{'list': lst.id, 'cards': [card.id]}]}
+
+    assert client_for(world['viewer']).post(url, body, format='json').status_code == 403
+    assert client_for(world['stranger']).post(url, body, format='json').status_code == 404
+
+    stranger_board = Board.objects.create(name='Other', owner=world['stranger'])
+    foreign_list = List.objects.create(board=stranger_board, name='X', position=0)
+    foreign_card = Card.objects.create(list=foreign_list, title='X', position=0)
+    editor = client_for(world['editor'])
+    assert editor.post(url, {'lists': [foreign_list.id], 'cards': []}, format='json').status_code == 400
+    assert editor.post(url, {'lists': [lst.id], 'cards': [{'list': lst.id, 'cards': [foreign_card.id]}]}, format='json').status_code == 400
+    assert editor.post(url, {'lists': [lst.id], 'cards': [{'list': lst.id, 'cards': [card.id, card.id]}]}, format='json').status_code == 400
+    assert editor.post(url, {'lists': 'nope', 'cards': []}, format='json').status_code == 400
+
+    foreign_card.refresh_from_db()
+    assert foreign_card.list_id == foreign_list.id

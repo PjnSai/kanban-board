@@ -575,3 +575,15 @@ export const updateCardDescription = (cardId: number, description: string) =>
     { description },
     "Could not save the description",
   );
+
+export const reorderBoard = (
+  boardId: number,
+  lists: number[],
+  cards: { list: number; cards: number[] }[],
+) =>
+  invitationRequest(
+    `/boards/${boardId}/reorder/`,
+    "POST",
+    { lists, cards },
+    "Could not save the new order",
+  );

@@ -176,7 +176,35 @@ export function useBoard(boardId: number) {
           };
         });
       }
-
+      if (data.event === "board_reordered") {
+        setBoard((prev) => {
+          if (!prev) return prev;
+          const cards = new Map(
+            prev.lists.flatMap((l) => l.cards.map((c) => [c.id, c])),
+          );
+          const columns = new Map<number, number[]>(
+            (data.cards as { list: number; cards: number[] }[]).map((c) => [
+              c.list,
+              c.cards,
+            ]),
+          );
+          const byId = new Map(prev.lists.map((l) => [l.id, l]));
+          const ordered = (data.lists as number[])
+            .map((id) => byId.get(id))
+            .filter((l): l is List => !!l)
+            .map((l) => {
+              const ids = columns.get(l.id);
+              if (!ids) return l;
+              return {
+                ...l,
+                cards: ids
+                  .map((id) => cards.get(id))
+                  .filter((c): c is Card => !!c),
+              };
+            });
+          return { ...prev, lists: ordered };
+        });
+      }
       if (data.event === "card_deleted") {
         setBoard((prev) => {
           if (!prev) return prev;
