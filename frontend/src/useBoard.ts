@@ -11,6 +11,7 @@ import {
   getWsTicket,
 } from "./api";
 import { useConfirm } from "./confirmContext";
+import { openLiveSocket } from "./liveSocket";
 
 interface Card {
   id: number;
@@ -75,14 +76,11 @@ export function useBoard(boardId: number) {
 
   useEffect(() => {
     if (!boardId) return;
-    let ws: WebSocket | undefined;
-    let cancelled = false;
 
     const reloadBoard = async () => {
       try {
         const res = await apiFetch(`${API_BASE}/boards/${boardId}/`);
         if (res.status === 403 || res.status === 404) {
-          ws?.close();
           setRemoved(true);
           return;
         }
@@ -221,21 +219,18 @@ export function useBoard(boardId: number) {
         reloadBoard();
       }
     };
-    getWsTicket(boardId)
-      .then((ticket) => {
-        if (cancelled) return;
-        ws = new WebSocket(
-          `${WS_BASE}/boards/${boardId}/?ticket=${encodeURIComponent(ticket)}`,
-        );
-        ws.onmessage = handleMessage;
-      })
-      .catch(() => {
-        // not a member, or session expired: no live updates
-      });
+    const connection = openLiveSocket({
+      getUrl: async () =>
+        `${WS_BASE}/boards/${boardId}/?ticket=${encodeURIComponent(await getWsTicket(boardId))}`,
+      onMessage: handleMessage,
+      onResync: () => reloadBoard(),
+      onGiveUp: (reason) => {
+        if (reason === "no-access") setRemoved(true);
+      },
+    });
 
     return () => {
-      cancelled = true;
-      ws?.close();
+      connection.close();
     };
   }, [boardId]);
 
