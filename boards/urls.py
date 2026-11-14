@@ -1,5 +1,5 @@
 from rest_framework.routers import DefaultRouter
-from .views import BoardViewSet, ListViewSet, CardViewSet, RegisterView, LogoutView, DeleteAccountView, PasswordResetRequestView, PasswordResetConfirmView, MeView, ChangeEmailView, ChangePasswordView, WebSocketTicketView
+from .views import BoardViewSet, ListViewSet, CardViewSet, RegisterView, LogoutView, DeleteAccountView, PasswordResetRequestView, PasswordResetConfirmView, MeView, ChangeEmailView, ChangePasswordView, WebSocketTicketView, ReorderView
 from django.urls import path
 from .invitation_views import (
     BoardInvitationsView, MyInvitationsView, InvitationDetailView,
@@ -42,5 +42,5 @@ urlpatterns = router.urls + [
     path('notifications/<int:pk>/', NotificationDetailView.as_view(), name='notification-detail'),
     path('notifications/dismiss-all/', DismissAllView.as_view(), name='notifications-dismiss-all'),
     path('notifications/<int:pk>/dismiss/', DismissView.as_view(), name='notification-dismiss'),
-    
+    path('boards/<int:board_id>/reorder/', ReorderView.as_view(), name='reorder'),
 ]

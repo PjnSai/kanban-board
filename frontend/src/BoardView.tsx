@@ -18,7 +18,7 @@ import {
   horizontalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
-import { updateCard, updateListPosition } from "./api";
+import { reorderBoard } from "./api";
 import PageMessage from "./PageMessage";
 import CardDetailDialog from "./CardDetailDialog";
 
@@ -138,9 +138,15 @@ function BoardView() {
       const reordered = arrayMove(board.lists, oldIndex, newIndex);
       setBoard({ ...board, lists: reordered });
 
-      reordered.forEach((list, index) => {
-        updateListPosition(list.id, index).catch(console.error);
-      });
+      reorderBoard(
+        board.id,
+        reordered.map((l) => l.id),
+        [],
+      ).catch(() =>
+        setNotice(
+          "Could not save the new order. Reload to see the saved order.",
+        ),
+      );
       return;
     }
 
@@ -185,18 +191,19 @@ function BoardView() {
 
     setBoard({ ...board, lists: newLists });
 
-    newLists[sourceListIndex].cards.forEach((card, index) => {
-      updateCard(card.id, newLists[sourceListIndex].id, index).catch(
-        console.error,
-      );
-    });
-    if (destListIndex !== sourceListIndex) {
-      newLists[destListIndex].cards.forEach((card, index) => {
-        updateCard(card.id, newLists[destListIndex].id, index).catch(
-          console.error,
-        );
-      });
-    }
+    const changed = new Set([
+      newLists[sourceListIndex].id,
+      newLists[destListIndex].id,
+    ]);
+    reorderBoard(
+      board.id,
+      newLists.map((l) => l.id),
+      newLists
+        .filter((l) => changed.has(l.id))
+        .map((l) => ({ list: l.id, cards: l.cards.map((c) => c.id) })),
+    ).catch(() =>
+      setNotice("Could not save the new order. Reload to see the saved order."),
+    );
   }
   if (removed)
     return (

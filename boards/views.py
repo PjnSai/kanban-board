@@ -39,8 +39,10 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.core import signing
 from .models import Board, List, Card, BoardMembership
 from .board_permissions import EditorOrReadOnly
-from .roles import get_role
+from .roles import get_role, has_role
 from .notifications import notify, disconnect_user_sockets
+from django.db import transaction
+
 
 DAILY_EMAIL_LIMIT = 300
 
@@ -190,7 +192,54 @@ def disconnect_member(board_id, user_id):
     except Exception:
         logger.exception('Could not disconnect removed member')
 
+class ReorderView(APIView):
+    """Save a drag-and-drop result in one request: new list order and card positions."""
+    permission_classes = [permissions.IsAuthenticated]
 
+    def post(self, request, board_id):
+        board = Board.objects.filter(
+            Q(owner=request.user) | Q(collaborators=request.user), pk=board_id
+        ).distinct().first()
+        if board is None:
+            return Response({'detail': 'Not found.'}, status=404)
+        if not has_role(request.user, board, 'editor'):
+            return Response({'detail': "You don't have permission to change this board."}, status=403)
+
+        list_ids = request.data.get('lists', [])
+        columns = request.data.get('cards', [])
+        if not isinstance(list_ids, list) or not isinstance(columns, list):
+            return Response({'detail': 'Invalid data.'}, status=400)
+        if len(list_ids) > 50 or len(columns) > 50:
+            return Response({'detail': 'Too much data.'}, status=400)
+
+        board_lists = {l.id: l for l in List.objects.filter(board=board)}
+        card_ids = []
+        for column in columns:
+            if not isinstance(column, dict) or column.get('list') not in board_lists:
+                return Response({'detail': 'Invalid list.'}, status=400)
+            ids = column.get('cards', [])
+            if not isinstance(ids, list):
+                return Response({'detail': 'Invalid cards.'}, status=400)
+            card_ids.extend(ids)
+        if len(card_ids) > 400 or len(set(card_ids)) != len(card_ids):
+            return Response({'detail': 'Invalid cards.'}, status=400)
+        if any(not isinstance(i, int) or i not in board_lists for i in list_ids) or len(set(list_ids)) != len(list_ids):
+            return Response({'detail': 'Invalid lists.'}, status=400)
+
+        cards = {c.id: c for c in Card.objects.filter(list__board=board, id__in=card_ids)}
+        if len(cards) != len(card_ids):
+            return Response({'detail': 'Invalid cards.'}, status=400)
+
+        with transaction.atomic():
+            for position, list_id in enumerate(list_ids):
+                List.objects.filter(pk=list_id).update(position=position)
+            for column in columns:
+                for position, card_id in enumerate(column['cards']):
+                    Card.objects.filter(pk=card_id).update(list_id=column['list'], position=position)
+
+        broadcast_board_event(board.id, 'board_reordered', request, lists=list_ids, cards=columns)
+        return Response({'detail': 'Saved.'})
+    
 class ListViewSet(viewsets.ModelViewSet):
     serializer_class = ListSerializer
     permission_classes = [permissions.IsAuthenticated, EditorOrReadOnly]
