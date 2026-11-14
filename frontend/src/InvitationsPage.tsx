@@ -11,6 +11,7 @@ import {
   ApiError,
 } from "./api";
 import type { Invitation, InvitationLimits } from "./api";
+import { onLiveEvent } from "./liveEvents";
 
 function errMsg(err: unknown) {
   return err instanceof Error ? err.message : "Something went wrong";
@@ -46,7 +47,15 @@ function InvitationsPage() {
       if (document.visibilityState === "visible") load();
     }
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    const stopListening = onLiveEvent((message) => {
+      if (message.event === "notification" || message.event === "resync") {
+        load();
+      }
+    });
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      stopListening();
+    };
   }, [load]);
 
   async function act(action: () => Promise<unknown>) {

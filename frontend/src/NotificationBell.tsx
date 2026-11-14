@@ -8,6 +8,7 @@ import {
   dismissAllNotifications,
 } from "./api";
 import type { AppNotification } from "./api";
+import { onLiveEvent } from "./liveEvents";
 
 const PREVIEW_COUNT = 5;
 
@@ -69,6 +70,15 @@ function NotificationBell() {
     }
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [load]);
+
+  // Reload when the server pushes a notification, or after a reconnect
+  useEffect(() => {
+    return onLiveEvent((message) => {
+      if (message.event === "notification" || message.event === "resync") {
+        load();
+      }
+    });
   }, [load]);
 
   // Close on Escape or a click outside

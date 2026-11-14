@@ -19,6 +19,7 @@ import {
 import { updateBoardPosition } from "./api";
 import { leaveBoard } from "./api";
 import { useConfirm } from "./confirmContext";
+import { onLiveEvent } from "./liveEvents";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -86,6 +87,15 @@ function Dashboard() {
       .then((data) => setBoards(data))
       .catch((err) => setError(err.message));
   }
+
+  // Refresh the board list when something changes for me (invited, removed, role changed, board deleted)
+  useEffect(() => {
+    return onLiveEvent((message) => {
+      if (message.event === "notification" || message.event === "resync") {
+        reloadBoards();
+      }
+    });
+  }, []);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;

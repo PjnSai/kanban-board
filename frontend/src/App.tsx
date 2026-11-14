@@ -11,7 +11,9 @@ import PageMessage from "./PageMessage";
 import NotificationBell from "./NotificationBell";
 import NotificationsPage from "./NotificationsPage";
 import InvitationsPage from "./InvitationsPage";
-import { getMyInvitations } from "./api";
+import { getMyInvitations, getUserWsTicket } from "./api";
+import { openLiveSocket } from "./liveSocket";
+import { emitLiveEvent, onLiveEvent } from "./liveEvents";
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
@@ -28,7 +30,33 @@ function App() {
       if (document.visibilityState === "visible") load();
     }
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    const stopListening = onLiveEvent((message) => {
+      if (message.event === "notification" || message.event === "resync") {
+        load();
+      }
+    });
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      stopListening();
+    };
+  }, [loggedIn]);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    const base = import.meta.env.VITE_WS_BASE;
+    const connection = openLiveSocket({
+      getUrl: async () =>
+        `${base}/me/?ticket=${encodeURIComponent(await getUserWsTicket())}`,
+      onMessage: (event) => {
+        try {
+          emitLiveEvent(JSON.parse(event.data));
+        } catch {
+          // ignore a malformed message
+        }
+      },
+      onResync: () => emitLiveEvent({ event: "resync" }),
+    });
+    return () => connection.close();
   }, [loggedIn]);
 
   if (!loggedIn) {

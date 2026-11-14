@@ -285,12 +285,12 @@ export async function changePassword(
 }
 
 export async function getWsTicket(boardId: string | number): Promise<string> {
-  const res = await apiFetch(`${API_BASE}/boards/${boardId}/ws-ticket/`, {
-    method: "GET",
-  });
-  const data = await parseJson(res);
-  if (!res.ok)
-    throw new Error(formatApiError(data, "Could not open live updates"));
+  const data = await invitationRequest(
+    `/boards/${boardId}/ws-ticket/`,
+    "GET",
+    undefined,
+    "Could not open live updates",
+  );
   return data.ticket;
 }
 
@@ -557,3 +557,13 @@ export const getAllNotifications = (): Promise<
     undefined,
     "Could not load notifications",
   );
+
+export async function getUserWsTicket(): Promise<string> {
+  const data = await invitationRequest(
+    "/notifications/ws-ticket/",
+    "GET",
+    undefined,
+    "Could not open live notifications",
+  );
+  return data.ticket;
+}
