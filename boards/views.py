@@ -91,6 +91,7 @@ class BoardViewSet(viewsets.ModelViewSet):
         instance.delete()
         for member in members:
             notify(member, 'board_deleted', f'The board "{name}" was deleted by its owner.', board_id)
+            disconnect_member(board_id, member.id)
 
     @action(detail=True, methods=['get'], url_path='members')
     def members(self, request, pk=None):
@@ -275,9 +276,45 @@ class DeleteAccountView(APIView):
     throttle_scope = 'account_sensitive'
 
     def delete(self, request):
-        if not request.user.check_password(request.data.get('password', '')):
+        user = request.user
+        if not user.check_password(request.data.get('password', '')):
             return Response({'detail': 'Your password is incorrect.'}, status=400)
-        request.user.delete()
+
+        username = user.username
+
+        # Boards this person owns disappear with the account: remember who to tell
+        owned = [
+            (board.id, board.name, list(board.collaborators.all()))
+            for board in Board.objects.filter(owner=user)
+        ]
+
+        # Boards they are a member of: the owner and managers should hear that they left
+        joined = []
+        for board in Board.objects.filter(collaborators=user).select_related('owner'):
+            managers = list(
+                User.objects.filter(
+                    board_memberships__board=board, board_memberships__role='manager'
+                ).exclude(pk=user.pk)
+            )
+            joined.append((board, [board.owner, *managers]))
+
+        _revoke_refresh_tokens(user)  # also closes their live connections
+        user.delete()
+
+        for board_id, name, members in owned:
+            for member in members:
+                notify(
+                    member, 'board_deleted',
+                    f'The board "{name}" was deleted because its owner closed their account.',
+                    board_id,
+                )
+                disconnect_member(board_id, member.id)
+
+        for board, people in joined:
+            for person in people:
+                notify(person, 'member_left', f'{username} left "{board.name}" because they closed their account.', board.id)
+            broadcast_board_event(board.id, 'collaborator_removed', request, username=username)
+
         return Response(status=204)
 
 logger = logging.getLogger(__name__)
