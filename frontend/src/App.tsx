@@ -14,6 +14,7 @@ import InvitationsPage from "./InvitationsPage";
 import { getMyInvitations, getUserWsTicket } from "./api";
 import { openLiveSocket } from "./liveSocket";
 import { emitLiveEvent, onLiveEvent } from "./liveEvents";
+import ServiceNotice from "./ServiceNotice";
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
@@ -77,6 +78,7 @@ function App() {
   return (
     <ConfirmProvider>
       <div className="min-h-screen bg-slate-50">
+        <ServiceNotice />
         <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
           <Link
             to="/"
