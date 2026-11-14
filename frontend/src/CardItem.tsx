@@ -11,6 +11,8 @@ interface CardItemProps {
   onSaveEdit: () => void;
   onDelete: () => void;
   canEdit: boolean;
+  hasDescription: boolean;
+  onOpen: () => void;
 }
 
 function CardItem({
@@ -23,6 +25,8 @@ function CardItem({
   onSaveEdit,
   onDelete,
   canEdit,
+  hasDescription,
+  onOpen,
 }: CardItemProps) {
   const {
     attributes,
@@ -73,6 +77,18 @@ function CardItem({
       }`}
     >
       {title}
+      {(canEdit || hasDescription) && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="mt-1 block text-xs text-slate-400 hover:text-blue-600"
+        >
+          {hasDescription ? "Details ≡" : "+ Add details"}
+        </button>
+      )}
       {canEdit && (
         <button
           onClick={(e) => {
